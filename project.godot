@@ -1,0 +1,45 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="修仙：宗门风云"
+config/description="一款经典网文风格的修仙门派模拟经营游戏。从一座破败山门、寥寥数名弟子起步，通过收徒授业、经营资源、外交博弈，将门派发展为修真界巨擘。"
+config/version="0.1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.6")
+
+[autoload]
+
+TypeRegistry="*res://src/core/autoload/type_registry.gd"
+GameManager="*res://src/core/autoload/game_manager.gd"
+EventBus="*res://src/core/autoload/event_bus.gd"
+TimeManager="*res://src/core/autoload/time_manager.gd"
+DataRegistry="*res://src/core/autoload/data_registry.gd"
+SaveManager="*res://src/core/autoload/save_manager.gd"
+SectController="*res://src/gameplay/sect_controller.gd"
+DiscipleController="*res://src/gameplay/disciple_controller.gd"
+AlchemyController="*res://src/gameplay/alchemy_controller.gd"
+EventController="*res://src/gameplay/event_controller.gd"
+CombatController="*res://src/gameplay/combat_controller.gd"
+TimeController="*res://src/gameplay/time_controller.gd"
+WorldController="*res://src/gameplay/world_controller.gd"
+GameSetup="*res://src/gameplay/game_setup.gd"
+RecruitmentController="*res://src/gameplay/recruitment_controller.gd"
+DungeonController="*res://src/gameplay/dungeon_controller.gd"
+ThemeManager="*res://src/ui/theme_manager.gd"
+TextureGenerator="*res://src/ui/texture_generator.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/mode=2
+window/title="修仙：宗门风云"

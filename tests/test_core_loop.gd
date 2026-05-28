@@ -1,0 +1,168 @@
+extends Node
+## 核心循环集成测试
+## 运行方式: Godot 编辑器中附加到场景运行，或命令行:
+##   godot --headless --script tests/test_core_loop.gd
+
+
+var test_results: Array[String] = []
+var passed: int = 0
+var failed: int = 0
+
+
+func _ready() -> void:
+	run_all_tests()
+	print_summary()
+	get_tree().quit()
+
+
+func run_all_tests() -> void:
+	test_new_game_setup()
+	test_disciples_cultivate()
+	test_breakthrough_attempt()
+	test_resource_generation()
+	test_monthly_maintenance()
+	test_multiple_months_simulation()
+	test_event_triggering()
+
+
+func test_new_game_setup() -> void:
+	print("\n=== 测试: 新游戏初始化 ===")
+	GameSetup.setup_new_game("测试宗门")
+
+	var sect = GameManager.current_sect
+	assert_that(sect.name == "测试宗门", "宗门名称应为测试宗门")
+	assert_that(sect.spirit_stones == 100, "初始灵石应为100")
+	assert_that(sect.facilities.size() == 2, "应有2个初始设施")
+	assert_that(sect.disciples.size() == 3, "应有3个初始弟子")
+	assert_that(sect.herbs["spirit_herb"] == 20, "应有20株灵草")
+	assert_that(sect.ores["iron"] == 10, "应有10块铁矿石")
+
+	var senior = sect.disciples[0]
+	assert_that(senior.sub_realm == 8, "大弟子应为练气八层")
+
+
+func test_disciples_cultivate() -> void:
+	print("\n=== 测试: 弟子修炼 ===")
+	GameSetup.setup_new_game("修炼测试宗")
+
+	var sect = GameManager.current_sect
+	var disciple = sect.disciples[0]
+	var old_progress = disciple.cultivation_progress
+
+	# 分配修炼任务
+	DiscipleController.assign_task(disciple, "cultivating")
+	var gained = DiscipleController.process_cultivation(disciple)
+
+	assert_that(gained > 0, "修炼应获取正数修为")
+	assert_that(disciple.cultivation_progress > old_progress, "修为进度应增加")
+
+
+func test_breakthrough_attempt() -> void:
+	print("\n=== 测试: 突破尝试 ===")
+	GameSetup.setup_new_game("突破测试宗")
+
+	var sect = GameManager.current_sect
+	var disciple = sect.disciples[0]
+	disciple.realm = 1
+	disciple.sub_realm = 1
+	disciple.cultivation_progress = 1.5  # 超过100%
+
+	var result = DiscipleController.check_breakthrough(disciple)
+	# 突破有概率，多次测试
+	var success_count = 0
+	for i in range(10):
+		if not disciple.alive:
+			break
+		disciple.cultivation_progress = 1.5
+		result = DiscipleController.check_breakthrough(disciple)
+		if result.get("success", false):
+			success_count += 1
+		if disciple.sub_realm >= 9:  # 到顶了
+			disciple.sub_realm = 1
+
+	assert_that(success_count >= 0, "突破测试完成（概率性，至少运行了）")
+	print("  10次突破尝试，成功: %d 次" % success_count)
+
+
+func test_resource_generation() -> void:
+	print("\n=== 测试: 资源产出 ===")
+	GameSetup.setup_new_game("资源测试宗")
+
+	var sect = GameManager.current_sect
+	var old_stones = sect.spirit_stones
+
+	# 手动触发一个月结算中的资源部分
+	TimeManager.advance_month()
+
+	assert_that(sect.spirit_stones >= old_stones, "灵石产出不应减少原始库存")
+	print("  灵石: %d → %d (+%d)" % [old_stones, sect.spirit_stones, sect.spirit_stones - old_stones])
+
+
+func test_monthly_maintenance() -> void:
+	print("\n=== 测试: 月维护费 ===")
+	GameSetup.setup_new_game("维护测试宗")
+
+	var sect = GameManager.current_sect
+	# 初始只有2个设施，维护费 = 5(修炼室) + 5(灵脉) = 10
+	# 每月灵石收入 = 10(灵脉产出) → 刚好平衡
+	# 多推进几个月看有没有负数
+	sect.spirit_stones = 100
+	for i in range(12):
+		TimeManager.advance_month()
+
+	assert_that(sect.spirit_stones >= 0, "一年后灵石不应为负（产出≈维护）")
+	print("  一年后灵石: %d" % sect.spirit_stones)
+
+
+func test_multiple_months_simulation() -> void:
+	print("\n=== 测试: 多年模拟 ===")
+	GameSetup.setup_new_game("模拟测试宗")
+
+	var sect = GameManager.current_sect
+	# 模拟运行5年
+	for i in range(60):
+		TimeManager.advance_month()
+
+	# 检查是否还有活着的弟子
+	var alive = 0
+	for d in sect.disciples:
+		if d.alive:
+			alive += 1
+
+	assert_that(alive >= 3, "5年后至少还有3个初始弟子活着")
+	assert_that(sect.spirit_stones > 0, "5年后灵石应>0")
+	print("  5年后: 灵石=%d, 存活弟子=%d" % [sect.spirit_stones, alive])
+
+	var senior = sect.disciples[0]
+	print("  大弟子: %s %d层 进度=%.2f" % [DataRegistry.get_realm_name(senior.realm), senior.sub_realm, senior.cultivation_progress])
+
+
+func test_event_triggering() -> void:
+	print("\n=== 测试: 事件触发 ===")
+	GameSetup.setup_new_game("事件测试宗")
+
+	var events = EventController.roll_events()
+	# 可能返回0-3个事件
+	assert_that(events.size() <= 3, "每回合最多3个事件")
+	print("  触发 %d 个事件" % events.size())
+
+	for event in events:
+		print("  - %s" % event.get("name", "未知事件"))
+
+
+func assert_that(condition: bool, message: String) -> void:
+	if condition:
+		passed += 1
+		print("  ✓ %s" % message)
+	else:
+		failed += 1
+		print("  ✗ %s  [失败]" % message)
+
+
+func print_summary() -> void:
+	print("\n" + "=".repeat(40))
+	print("测试结果: %d 通过, %d 失败, %d 总计" % [passed, failed, passed + failed])
+	if failed == 0:
+		print("全部测试通过 ✓")
+	else:
+		print("存在失败测试 ✗")

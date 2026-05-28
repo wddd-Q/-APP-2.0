@@ -1,0 +1,28 @@
+# Godot
+.godot/
+*.import
+*.translation
+export/
+export_presets.cfg
+
+# Godot 4 specific
+android/
+ios/
+web/
+
+# Production state (ephemeral)
+production/session-state/
+production/session-logs/
+production/review-mode.txt
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.sln
+*.csproj
+*.user

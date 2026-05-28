@@ -1,0 +1,86 @@
+[gd_scene load_steps=2 format=3 uid="uid://dmainmenu001"]
+
+[ext_resource type="Script" path="res://src/ui/main_menu.gd" id="1_script"]
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 1920.0
+offset_bottom = 1080.0
+color = Color(0.1, 0.08, 0.05, 1.0)
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 100.0
+offset_right = 1520.0
+offset_bottom = 200.0
+text = "修仙：宗门风云"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_font_sizes/font_size = 72
+theme_override_colors/font_color = Color(0.9, 0.85, 0.6, 1.0)
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 660.0
+offset_top = 300.0
+offset_right = 1260.0
+offset_bottom = 800.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 580.0
+offset_bottom = 480.0
+theme_override_constants/separation = 20
+
+[node name="SectNameLabel" type="Label" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "宗门名称"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+
+[node name="SectNameInput" type="LineEdit" parent="Panel/VBoxContainer"]
+layout_mode = 2
+placeholder_text = "输入宗门名称..."
+
+[node name="Separator1" type="HSeparator" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="NewGameButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "开创新宗门"
+theme_override_font_sizes/font_size = 28
+
+[node name="LoadGameButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "继续修炼"
+theme_override_font_sizes/font_size = 28
+
+[node name="SettingsButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "设置"
+theme_override_font_sizes/font_size = 28
+
+[node name="QuitButton" type="Button" parent="Panel/VBoxContainer"]
+layout_mode = 2
+text = "退出游戏"
+theme_override_font_sizes/font_size = 28
+
+[node name="SaveSlots" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 660.0
+offset_top = 300.0
+offset_right = 1260.0
+offset_bottom = 800.0

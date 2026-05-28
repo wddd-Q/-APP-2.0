@@ -1,0 +1,312 @@
+[gd_scene load_steps=15 format=3 uid="uid://dmainscene001"]
+
+[ext_resource type="Script" path="res://src/ui/game_hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://src/ui/sect_overview.gd" id="2_overview"]
+[ext_resource type="Script" path="res://src/ui/event_dialog.gd" id="3_event"]
+[ext_resource type="Script" path="res://src/ui/disciple_recruit_panel.gd" id="4_recruit"]
+[ext_resource type="Script" path="res://src/ui/disciple_detail_panel.gd" id="5_detail"]
+[ext_resource type="Script" path="res://src/ui/alchemy_panel.gd" id="6_alchemy"]
+[ext_resource type="Script" path="res://src/ui/diplomacy_panel.gd" id="7_diplomacy"]
+[ext_resource type="Script" path="res://src/ui/world_map.gd" id="8_worldmap"]
+[ext_resource type="Script" path="res://src/ui/save_panel.gd" id="9_save"]
+[ext_resource type="Script" path="res://src/ui/dungeon_panel.gd" id="10_dungeon"]
+[ext_resource type="Script" path="res://src/ui/world_lore_panel.gd" id="11_lore"]
+[ext_resource type="Script" path="res://src/ui/warehouse_panel.gd" id="12_warehouse"]
+[ext_resource type="Script" path="res://src/ui/sect_view_panel.gd" id="13_sectview"]
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.06, 0.04, 1.0)
+
+[node name="GameHUD" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+script = ExtResource("1_hud")
+
+[node name="TopBar" type="HBoxContainer" parent="GameHUD"]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 5.0
+offset_right = 1910.0
+offset_bottom = 45.0
+theme_override_constants/separation = 20
+
+[node name="DateLabel" type="Label" parent="GameHUD/TopBar"]
+layout_mode = 2
+text = "宗门历1年 春 (1月)"
+theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.9, 0.85, 0.6, 1.0)
+
+[node name="SpiritStonesLabel" type="Label" parent="GameHUD/TopBar"]
+layout_mode = 2
+text = "灵石: 50"
+theme_override_font_sizes/font_size = 18
+
+[node name="PrestigeLabel" type="Label" parent="GameHUD/TopBar"]
+layout_mode = 2
+text = "声望: 0"
+theme_override_font_sizes/font_size = 18
+
+[node name="DiscipleCountLabel" type="Label" parent="GameHUD/TopBar"]
+layout_mode = 2
+text = "弟子: 0/5"
+theme_override_font_sizes/font_size = 18
+
+[node name="NotificationBadge" type="Label" parent="GameHUD/TopBar"]
+visible = false
+layout_mode = 2
+text = ""
+theme_override_colors/font_color = Color(1.0, 0.8, 0.2, 1.0)
+
+[node name="AdvanceMonthButton" type="Button" parent="GameHUD/TopBar"]
+layout_mode = 2
+text = "推进一月 ▶"
+theme_override_font_sizes/font_size = 18
+
+[node name="MainView" type="Control" parent="."]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 60.0
+offset_right = 1910.0
+offset_bottom = 1070.0
+
+[node name="TabContainer" type="TabContainer" parent="MainView"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="SectOverview" type="Control" parent="MainView/TabContainer"]
+layout_mode = 2
+script = ExtResource("2_overview")
+
+[node name="SectInfo" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 1860.0
+offset_bottom = 100.0
+
+[node name="SectNameLabel" type="Label" parent="MainView/TabContainer/SectOverview/SectInfo"]
+layout_mode = 2
+text = "宗门名称"
+theme_override_font_sizes/font_size = 36
+theme_override_colors/font_color = Color(0.9, 0.85, 0.6, 1.0)
+
+[node name="RankLabel" type="Label" parent="MainView/TabContainer/SectOverview/SectInfo"]
+layout_mode = 2
+text = "九品宗门"
+
+[node name="Facilities" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 120.0
+offset_right = 600.0
+offset_bottom = 900.0
+
+[node name="FacilitiesTitle" type="Label" parent="MainView/TabContainer/SectOverview/Facilities"]
+layout_mode = 2
+text = "宗门设施"
+theme_override_font_sizes/font_size = 24
+
+[node name="FacilitiesList" type="VBoxContainer" parent="MainView/TabContainer/SectOverview/Facilities"]
+layout_mode = 2
+
+[node name="Disciples" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
+layout_mode = 0
+offset_left = 620.0
+offset_top = 120.0
+offset_right = 1240.0
+offset_bottom = 900.0
+
+[node name="DisciplesTitle" type="Label" parent="MainView/TabContainer/SectOverview/Disciples"]
+layout_mode = 2
+text = "弟子名册"
+theme_override_font_sizes/font_size = 24
+
+[node name="DisciplesBrief" type="VBoxContainer" parent="MainView/TabContainer/SectOverview/Disciples"]
+layout_mode = 2
+
+[node name="Resources" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
+layout_mode = 0
+offset_left = 1260.0
+offset_top = 120.0
+offset_right = 1860.0
+offset_bottom = 900.0
+
+[node name="ResourcesTitle" type="Label" parent="MainView/TabContainer/SectOverview/Resources"]
+layout_mode = 2
+text = "资源库存"
+theme_override_font_sizes/font_size = 24
+
+[node name="ResourcesList" type="VBoxContainer" parent="MainView/TabContainer/SectOverview/Resources"]
+layout_mode = 2
+
+[node name="Decrees" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 920.0
+offset_right = 1860.0
+offset_bottom = 980.0
+
+[node name="DecreesTitle" type="Label" parent="MainView/TabContainer/SectOverview/Decrees"]
+layout_mode = 2
+text = "门规"
+theme_override_font_sizes/font_size = 18
+
+[node name="ActiveDecreesLabel" type="Label" parent="MainView/TabContainer/SectOverview/Decrees"]
+layout_mode = 2
+text = "当前门规: 无"
+
+[node name="DisciplePanel" type="Control" parent="MainView/TabContainer"]
+layout_mode = 2
+visible = false
+
+[node name="DisciplePanelPlaceholder" type="Label" parent="MainView/TabContainer/DisciplePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+text = "弟子详细面板 — Phase 4 实现"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+
+[node name="WorldMap" type="Control" parent="MainView/TabContainer"]
+layout_mode = 2
+visible = false
+script = ExtResource("8_worldmap")
+
+[node name="EventDialog" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.25
+anchor_top = 0.25
+anchor_right = 0.75
+anchor_bottom = 0.75
+script = ExtResource("3_event")
+
+[node name="Panel" type="Panel" parent="EventDialog"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="EventTitle" type="Label" parent="EventDialog/Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 940.0
+offset_bottom = 60.0
+text = "事件标题"
+theme_override_font_sizes/font_size = 28
+
+[node name="EventDescription" type="Label" parent="EventDialog/Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 80.0
+offset_right = 940.0
+offset_bottom = 200.0
+text = "事件描述..."
+autowrap_mode = 2
+theme_override_font_sizes/font_size = 18
+
+[node name="Choices" type="VBoxContainer" parent="EventDialog/Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 220.0
+offset_right = 940.0
+offset_bottom = 500.0
+theme_override_constants/separation = 10
+
+[node name="DiscipleRecruitPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("4_recruit")
+
+[node name="DiscipleDetailPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("5_detail")
+
+[node name="AlchemyPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("6_alchemy")
+
+[node name="DiplomacyPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("7_diplomacy")
+
+[node name="SavePanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("9_save")
+
+[node name="DungeonPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("10_dungeon")
+
+[node name="WorldLorePanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("11_lore")
+
+[node name="WarehousePanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("12_warehouse")
+
+[node name="SectViewPanel" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 1
+script = ExtResource("13_sectview")
