@@ -67,6 +67,7 @@ static func _create_starter_disciple(sect: Resource, dname: String, gender: int,
 	d.personalities = personalities
 	d.specialty = _starter_specialty(dname)
 	d.origin_story = _starter_story(dname)
+	d.loyalty = _starter_loyalty(personalities)
 
 	sect.add_disciple(d)
 	d.add_memory("宗门历%d年 %s入门，成为本门初代弟子。" % [TimeManager.year, d.disciple_name])
@@ -94,3 +95,14 @@ static func _starter_story(dname: String) -> String:
 			return "由山下药户送入宗门，自小识得草木药性，待人温和，却也比旁人更能察觉伤病与心绪。"
 		_:
 			return "随掌门重整山门的初代弟子。"
+
+
+static func _starter_loyalty(personalities: Array) -> int:
+	var value = 62
+	if "忠诚" in personalities:
+		value += 16
+	if "孤傲" in personalities:
+		value -= 8
+	if "贪婪" in personalities or "阴狠" in personalities:
+		value -= 12
+	return clampi(value, 20, 95)

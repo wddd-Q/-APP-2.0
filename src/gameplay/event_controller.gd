@@ -81,17 +81,19 @@ func resolve_choice(event_id: String, choice: int, handler_id: String = "") -> D
 			return {"error": "无效选择"}
 
 		var selected = choices[choice]
+		var judgement = get_choice_judgement(event_id, choice, handler_id)
 		var result = _apply_event_effects(selected.get("effects", {}))
 		result["handler"] = _get_handler_summary(handler_id)
-		result["handler_judgement"] = get_choice_judgement(event_id, choice, handler_id)
+		result["handler_judgement"] = judgement
 
 		if selected.has("chain_tag"):
 			var tag = selected["chain_tag"]
 			event_chain_state[tag] = TimeManager.year
 
 		if not result.get("blocked", false):
+			_apply_handler_influence(handler_id, event, selected, result)
 			_record_resolved_event(event, selected, result)
-			_add_handler_memory(handler_id, event)
+			_add_handler_memory(handler_id, event, selected, result)
 
 		EventBus.event_choice_made.emit(event_id, choice)
 		if not result.get("blocked", false):
@@ -143,6 +145,22 @@ func get_choice_judgement(event_id: String, choice_idx: int, handler_id: String 
 		if event.get("id", "") == event_id:
 			return _judge_choice_by_handler(event, choice_idx, handler_id)
 	return {"score": 0, "label": "无判断", "reason": "未找到待处理事件。"}
+
+
+func get_handler_influence_preview(event_id: String, choice_idx: int, handler_id: String = "") -> String:
+	if handler_id == "":
+		return "掌门亲自处理：无弟子性格修正。"
+	var judgement = get_choice_judgement(event_id, choice_idx, handler_id)
+	var score = int(judgement.get("score", 0))
+	if score >= 4:
+		return "性格强烈契合：执行更顺，受命弟子忠诚明显上升。"
+	if score >= 2:
+		return "性格较为契合：执行稳定，受命弟子忠诚小幅上升。"
+	if score <= -4:
+		return "性格强烈抵触：可能留下不满记忆，忠诚下降。"
+	if score <= -2:
+		return "性格略有抵触：处理后可能产生轻微不满。"
+	return "性格影响较弱：主要按方案本身结算。"
 
 
 func _judge_choice_by_handler(event: Dictionary, choice_idx: int, handler_id: String) -> Dictionary:
@@ -255,11 +273,22 @@ func _get_handler_summary(handler_id: String) -> Dictionary:
 	}
 
 
-func _add_handler_memory(handler_id: String, event: Dictionary) -> void:
+func _add_handler_memory(handler_id: String, event: Dictionary, selected: Dictionary, result: Dictionary) -> void:
 	var disciple = _get_handler_disciple(handler_id)
 	if not disciple:
 		return
-	disciple.add_memory("宗门历%d年 受命处理宗门纪事「%s」。" % [TimeManager.year, event.get("name", "事件")])
+	var judgement = result.get("handler_judgement", {})
+	var influence = result.get("handler_influence", {})
+	var tail = ""
+	if not influence.is_empty():
+		tail = " %s" % influence.get("memory", "")
+	disciple.add_memory("宗门历%d年 受命处理宗门纪事「%s」，采用「%s」；判断为%s。%s" % [
+		TimeManager.year,
+		event.get("name", "事件"),
+		selected.get("label", "未记录"),
+		judgement.get("label", "可接受"),
+		tail,
+	])
 
 
 func _get_handler_disciple(handler_id: String):
@@ -487,6 +516,80 @@ func _process_active_impacts() -> void:
 		EventBus.event_ledger_changed.emit()
 
 
+func _apply_handler_influence(handler_id: String, _event: Dictionary, selected: Dictionary, result: Dictionary) -> void:
+	var disciple = _get_handler_disciple(handler_id)
+	if not disciple:
+		return
+
+	var judgement = result.get("handler_judgement", {})
+	var score = int(judgement.get("score", 0))
+	var action = selected.get("effects", {}).get("action", "")
+	var loyalty_delta = 0
+	var summary = ""
+	var memory = ""
+	var severity = ""
+
+	if score >= 4:
+		loyalty_delta = 5
+		summary = "%s处置此事与其性情高度契合，后续执行更顺。" % disciple.disciple_name
+		memory = "此事与其性情相合，对宗门托付更为认同。"
+		severity = "good"
+	elif score >= 2:
+		loyalty_delta = 2
+		summary = "%s对处理方案较为认同。" % disciple.disciple_name
+		memory = "对宗门安排较为认同。"
+		severity = "good"
+	elif score <= -4:
+		loyalty_delta = -5
+		summary = "%s虽完成差事，却明显不认同此番处置。" % disciple.disciple_name
+		memory = "对此番差事颇有抵触。"
+		severity = "warning"
+	elif score <= -2:
+		loyalty_delta = -2
+		summary = "%s处理此事后略有不满。" % disciple.disciple_name
+		memory = "对此番安排略有不满。"
+		severity = "warning"
+	else:
+		result["handler_influence"] = {}
+		return
+
+	_adjust_disciple_loyalty(disciple, loyalty_delta)
+	_apply_action_specific_handler_bonus(disciple, action, score, result)
+	result["messages"].append("%s忠诚 %+d" % [disciple.disciple_name, loyalty_delta])
+	result["handler_influence"] = {
+		"summary": summary,
+		"memory": memory,
+		"loyalty_delta": loyalty_delta,
+		"score": score,
+		"severity": severity,
+	}
+
+
+func _apply_action_specific_handler_bonus(disciple: Resource, action: String, score: int, result: Dictionary) -> void:
+	if score < 2:
+		if score <= -4 and action in ["force_cultivation", "punish", "combat_beast"]:
+			disciple.mentality = maxi(10, disciple.mentality - 2)
+			result["messages"].append("%s心境受扰" % disciple.disciple_name)
+		return
+
+	var sect = GameManager.current_sect
+	match action:
+		"mediate", "safe_cultivation", "steady_breakthrough", "temper_foundation":
+			disciple.mentality = mini(100, disciple.mentality + 2)
+			result["messages"].append("%s心性 +2" % disciple.disciple_name)
+		"guard_caravan", "open_trade":
+			disciple.charm = mini(100, disciple.charm + 2)
+			result["messages"].append("%s魅力 +2" % disciple.disciple_name)
+		"combat_beast", "punish":
+			disciple.bone_structure = mini(100, disciple.bone_structure + 1)
+			if sect:
+				sect.prestige += 5
+			result["messages"].append("%s威望渐立，宗门声望 +5" % disciple.disciple_name)
+		"invest_vein", "test_wanderer", "alchemy_lecture", "buy_foundation_materials":
+			disciple.comprehension = mini(100, disciple.comprehension + 1)
+			result["messages"].append("%s悟性 +1" % disciple.disciple_name)
+
+
 func _record_resolved_event(event: Dictionary, selected: Dictionary, result: Dictionary) -> void:
 	var impact = _make_impact_summary(event, selected, result)
 	var record = {
@@ -505,6 +608,7 @@ func _record_resolved_event(event: Dictionary, selected: Dictionary, result: Dic
 		"is_story": event.get("is_story", false),
 		"handler": result.get("handler", {}),
 		"handler_judgement": result.get("handler_judgement", {}),
+		"handler_influence": result.get("handler_influence", {}),
 	}
 	event_records.push_front(record)
 	if event_records.size() > MAX_EVENT_RECORDS:
@@ -524,9 +628,13 @@ func _record_resolved_event(event: Dictionary, selected: Dictionary, result: Dic
 
 
 func _make_impact_summary(event: Dictionary, selected: Dictionary, result: Dictionary) -> Dictionary:
+	var influence = result.get("handler_influence", {})
 	if selected.has("impact"):
+		var direct_summary = selected.get("impact", "无持续影响")
+		if not influence.is_empty():
+			direct_summary += " " + influence.get("summary", "")
 		return {
-			"summary": selected.get("impact", "无持续影响"),
+			"summary": direct_summary,
 			"months": selected.get("impact_months", 0),
 			"severity": selected.get("impact_severity", "neutral"),
 		}
@@ -535,23 +643,36 @@ func _make_impact_summary(event: Dictionary, selected: Dictionary, result: Dicti
 	var action = effects.get("action", "")
 	match action:
 		"combat_beast":
-			return {"summary": "山门周边妖兽被震慑，短期内灵田较安稳。", "months": 3, "severity": "good"}
+			return _with_handler_impact({"summary": "山门周边妖兽被震慑，短期内灵田较安稳。", "months": 3, "severity": "good"}, influence)
 		"evacuate":
-			return {"summary": "弟子避战保全实力，但附近妖兽活动仍未平息。", "months": 2, "severity": "warning"}
+			return _with_handler_impact({"summary": "弟子避战保全实力，但附近妖兽活动仍未平息。", "months": 2, "severity": "warning"}, influence)
 		"guard_caravan":
-			return {"summary": "商队愿意继续往来，坊市传闻对本门更友善。", "months": 4, "severity": "good"}
+			return _with_handler_impact({"summary": "商队愿意继续往来，坊市传闻对本门更友善。", "months": 4, "severity": "good"}, influence)
 		"open_trade":
-			return {"summary": "近期物资流通增加，仓库获得一次性补给。", "months": 1, "severity": "neutral"}
+			return _with_handler_impact({"summary": "近期物资流通增加，仓库获得一次性补给。", "months": 1, "severity": "neutral"}, influence)
 		"force_cultivation":
-			return {"summary": "门内修炼气氛紧绷，突破收益与心魔风险并存。", "months": 2, "severity": "warning"}
+			return _with_handler_impact({"summary": "门内修炼气氛紧绷，突破收益与心魔风险并存。", "months": 2, "severity": "warning"}, influence)
 		"safe_cultivation", "steady_breakthrough", "temper_foundation":
-			return {"summary": "弟子心态趋稳，闭关与突破反馈已记入名册。", "months": 3, "severity": "good"}
+			return _with_handler_impact({"summary": "弟子心态趋稳，闭关与突破反馈已记入名册。", "months": 3, "severity": "good"}, influence)
 		"mediate", "punish":
-			return {"summary": "门内秩序得到处理，弟子会观察掌门后续赏罚。", "months": 2, "severity": "neutral"}
+			return _with_handler_impact({"summary": "门内秩序得到处理，弟子会观察掌门后续赏罚。", "months": 2, "severity": "neutral"}, influence)
 		"record_generation_oath", "reward_generation_oath":
-			return {"summary": "初代弟子的归属感增强，此事成为宗门早期记忆。", "months": 6, "severity": "good"}
+			return _with_handler_impact({"summary": "初代弟子的归属感增强，此事成为宗门早期记忆。", "months": 6, "severity": "good"}, influence)
 		_:
-			return {"summary": "此事已归档，目前没有持续影响。", "months": 0, "severity": "neutral"}
+			return _with_handler_impact({"summary": "此事已归档，目前没有持续影响。", "months": 0, "severity": "neutral"}, influence)
+
+
+func _with_handler_impact(base: Dictionary, influence: Dictionary) -> Dictionary:
+	if influence.is_empty():
+		return base
+	var summary = influence.get("summary", "")
+	if summary != "":
+		base["summary"] = "%s %s" % [base.get("summary", ""), summary]
+	if int(base.get("months", 0)) == 0 and summary != "":
+		base["months"] = 1
+	if influence.get("severity", "") != "":
+		base["severity"] = influence.get("severity", base.get("severity", "neutral"))
+	return base
 
 
 func _summarize_effects(effects: Dictionary, messages: Array) -> String:
@@ -683,6 +804,7 @@ func _apply_event_effects(effects: Dictionary) -> Dictionary:
 
 func _action_recruit_wanderer(result: Dictionary) -> void:
 	var names_pool = ["风清扬", "林秋水", "苏长空", "白芷", "莫问天", "柳如烟", "叶无道", "花弄影"]
+	var personalities = _random_event_personalities()
 	var candidate = {
 		"name": names_pool[randi() % names_pool.size()],
 		"age": 16 + randi() % 20,
@@ -695,6 +817,9 @@ func _action_recruit_wanderer(result: Dictionary) -> void:
 		"talent": 30 + randi() % 40,
 		"root_quality": _random_root_quality(),
 		"elements": _random_elements(),
+		"personalities": personalities,
+		"specialty": "云游散修",
+		"origin_story": "此人曾独行诸地，临近山门时主动求见，言称愿以一身所学换取安身立命之所。性格偏%s。" % "、".join(personalities),
 		"recruit_cost": 0,  # 事件已扣灵石，不再重复扣
 	}
 	var d = RecruitmentController.recruit(candidate)
@@ -706,6 +831,7 @@ func _action_recruit_wanderer(result: Dictionary) -> void:
 
 func _action_test_wanderer(result: Dictionary) -> void:
 	var names_pool = ["楚云飞", "慕容霜", "秦无极", "南宫流云", "东方灵秀"]
+	var personalities = _random_event_personalities()
 	var candidate = {
 		"name": names_pool[randi() % names_pool.size()],
 		"age": 18 + randi() % 15,
@@ -718,6 +844,9 @@ func _action_test_wanderer(result: Dictionary) -> void:
 		"talent": 50 + randi() % 30,
 		"root_quality": _random_root_quality(),
 		"elements": _random_elements(),
+		"personalities": personalities,
+		"specialty": "受试奇才",
+		"origin_story": "此人经山门考校后方得入门，试炼中显露出几分不服输的劲头。性格偏%s。" % "、".join(personalities),
 		"recruit_cost": 0,  # 事件已扣灵石，不再重复扣
 	}
 	var d = RecruitmentController.recruit(candidate)
@@ -934,8 +1063,20 @@ func _action_reward_generation_oath(result: Dictionary) -> void:
 
 
 func _apply_loyalty_change(delta: int) -> void:
-	# 忠诚度变化暂时不影响具体机制，未来可扩展
-	pass
+	var sect = GameManager.current_sect
+	if not sect:
+		return
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		_adjust_disciple_loyalty(d, delta)
+		if abs(delta) >= 5:
+			var tone = "归属感增强" if delta > 0 else "对宗门处置心有疑虑"
+			d.add_memory("宗门历%d年 因宗门纪事处置，%s。" % [TimeManager.year, tone])
+
+
+func _adjust_disciple_loyalty(disciple: Resource, delta: int) -> void:
+	disciple.loyalty = clampi(int(disciple.loyalty) + delta, 0, 100)
 
 
 func _has_inventory_item(sect: Resource, item_id: String) -> bool:
@@ -987,9 +1128,15 @@ func _random_root_quality() -> String:
 
 
 func _random_elements() -> Array:
-	var all = ["金", "木", "水", "火", "土"]
+	var all = [0, 1, 2, 3, 4]
 	var count = 1 + randi() % 5
 	var result: Array = []
 	for i in range(count):
 		result.append(all[randi() % all.size()])
 	return result
+
+
+func _random_event_personalities() -> Array:
+	var pool = ["勇猛", "谨慎", "贪婪", "忠诚", "孤傲", "好奇", "善良", "阴狠", "豪爽", "内敛"]
+	pool.shuffle()
+	return pool.slice(0, 1 + randi() % 2)

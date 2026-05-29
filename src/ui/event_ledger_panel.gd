@@ -231,9 +231,11 @@ func _make_pending_card(event: Dictionary) -> Control:
 		var update_choice_preview = func(_idx: int = 0) -> void:
 			var selected_choice = int(choice_selector.get_item_metadata(maxi(0, choice_selector.selected)))
 			var judgement = EventController.get_choice_judgement(event.get("id", ""), selected_choice, handler_id)
-			detail.text = "判断：%s\n%s\n\n选择方案后不会立刻结算，点击下方确认按钮才会处理。" % [
+			var influence = EventController.get_handler_influence_preview(event.get("id", ""), selected_choice, handler_id)
+			detail.text = "判断：%s\n%s\n性格影响：%s\n\n选择方案后不会立刻结算，点击下方确认按钮才会处理。" % [
 				judgement.get("label", "可接受"),
 				judgement.get("reason", ""),
+				influence,
 			]
 			detail.add_theme_color_override("font_color", _get_judgement_color(int(judgement.get("score", 0))))
 
@@ -307,6 +309,9 @@ func _make_history_card(record: Dictionary) -> Control:
 		if not judgement.is_empty():
 			body.append_text(" · %s" % judgement.get("label", "可接受"))
 		body.append_text("\n")
+		var influence = record.get("handler_influence", {})
+		if not influence.is_empty():
+			body.append_text("性格影响：%s\n" % influence.get("summary", ""))
 	body.append_text("选择：%s\n" % record.get("choice", ""))
 	body.append_text("即时：%s\n" % record.get("immediate", ""))
 	body.append_text("后续：%s" % record.get("long_term", "无持续影响"))

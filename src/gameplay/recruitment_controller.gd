@@ -88,6 +88,7 @@ func recruit(candidate: Dictionary) -> DiscipleData:
 	d.personalities = candidate.get("personalities", [])
 	d.specialty = candidate.get("specialty", "")
 	d.origin_story = candidate.get("origin_story", "")
+	d.loyalty = _initial_loyalty(d.personalities)
 	var skill_focus = candidate.get("skill_focus", "")
 	if skill_focus != "":
 		d.skills[skill_focus] = 12 + randi() % 24
@@ -217,3 +218,16 @@ func _make_origin_story(dname: String, gender: int, specialty: String, personali
 		specialty,
 		trait_text,
 	]
+
+
+func _initial_loyalty(personalities: Array) -> int:
+	var value = 52 + randi() % 13
+	if "忠诚" in personalities:
+		value += 14
+	if "善良" in personalities or "豪爽" in personalities:
+		value += 5
+	if "贪婪" in personalities:
+		value -= 10
+	if "阴狠" in personalities or "孤傲" in personalities:
+		value -= 7
+	return clampi(value, 20, 95)

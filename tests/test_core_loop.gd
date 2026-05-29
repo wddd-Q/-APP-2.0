@@ -23,6 +23,7 @@ func run_all_tests() -> void:
 	test_monthly_maintenance()
 	test_recruitment_profiles()
 	test_event_ledger_panel_build()
+	test_event_handler_personality_influence()
 	test_onboarding_objectives()
 	test_multiple_months_simulation()
 	test_event_triggering()
@@ -166,6 +167,27 @@ func test_event_ledger_panel_build() -> void:
 	panel.queue_free()
 
 
+func test_event_handler_personality_influence() -> void:
+	print("\n=== 测试: 任职弟子处理纪事 ===")
+	GameSetup.setup_new_game("任事测试宗")
+	var sect = GameManager.current_sect
+	sect.spirit_stones = 1000
+	var handler = sect.disciples[0]
+	handler.loyalty = 60
+	SectController.assign_position(handler, "副长老")
+
+	var event = _find_event_template("disciple_conflict").duplicate(true)
+	EventController.active_events = [event]
+	var old_loyalty = handler.loyalty
+	var result = EventController.resolve_choice(event["id"], 0, handler.disciple_id)
+
+	assert_that(not result.get("blocked", false), "受命弟子应能处理纪事")
+	assert_that(handler.loyalty != old_loyalty, "性格判断应影响受命弟子忠诚")
+	assert_that(not result.get("handler_influence", {}).is_empty(), "结算结果应记录性格影响")
+	assert_that(not EventController.event_records.is_empty(), "处理后应生成纪事归档")
+	assert_that(str(handler.life_memories[-1]).contains("受命处理宗门纪事"), "受命弟子应获得处理纪事记忆")
+
+
 func test_onboarding_objectives() -> void:
 	print("\n=== 测试: 掌门初任目标 ===")
 	GameSetup.setup_new_game("初任测试宗")
@@ -241,6 +263,13 @@ func _objective_done(objective_id: String) -> bool:
 		if objective.get("id", "") == objective_id:
 			return objective.get("completed", false)
 	return false
+
+
+func _find_event_template(event_id: String) -> Dictionary:
+	for event in EventController.event_pool:
+		if event.get("id", "") == event_id:
+			return event
+	return {}
 
 
 func print_summary() -> void:

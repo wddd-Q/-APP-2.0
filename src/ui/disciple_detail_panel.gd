@@ -218,11 +218,12 @@ func _refresh_all() -> void:
 	_portrait.setup(_current_disciple, 64)
 	_name_label.text = _current_disciple.disciple_name
 	var realm_name = DataRegistry.get_realm_name(_current_disciple.realm)
-	_realm_label.text = "%s %d层 | %d岁/%d寿元" % [
+	_realm_label.text = "%s %d层 | %d岁/%d寿元 | 忠诚%d" % [
 		realm_name,
 		_current_disciple.sub_realm,
 		_current_disciple.age,
 		_current_disciple.lifespan,
+		_current_disciple.loyalty,
 	]
 
 	_refresh_grid(_attributes_grid, [

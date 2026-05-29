@@ -52,6 +52,7 @@ extends Resource
 @export var personalities: Array = []  # ["勇猛", "谨慎", "贪婪", "忠诚", ...]
 @export var specialty: String = ""  # 擅长方向，如炼丹、剑修、阵法
 @export var origin_story: String = ""  # 入门前经历
+@export var loyalty: int = 50  # 对宗门的归属感，影响叛逃/任事风险
 
 ## 当前状态
 @export var assigned_task: String = ""  # cultivating/alchemy/exploring/guarding/idle

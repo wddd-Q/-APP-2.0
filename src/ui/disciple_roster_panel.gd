@@ -178,10 +178,12 @@ func _update_summary(sect: Resource) -> void:
 	var ready = 0
 	var risk = 0
 	var away = 0
+	var loyalty_total = 0
 	for d in sect.disciples:
 		if not d.alive:
 			continue
 		alive += 1
+		loyalty_total += int(d.loyalty)
 		if d.position != "普通弟子":
 			officers += 1
 		if d.cultivation_progress >= 1.0:
@@ -192,9 +194,11 @@ func _update_summary(sect: Resource) -> void:
 			away += 1
 
 	_summary_label.clear()
-	_summary_label.append_text("弟子 [color=#d9c85f]%d/%d[/color]  任职 [color=#d9c85f]%d[/color]  可突破 [color=#d9c85f]%d[/color]  外派 [color=#d9c85f]%d[/color]  风险关注 [color=#d9c85f]%d[/color]" % [
+	var average_loyalty = int(float(loyalty_total) / maxf(1.0, float(alive)))
+	_summary_label.append_text("弟子 [color=#d9c85f]%d/%d[/color]  平均忠诚 [color=#d9c85f]%d[/color]  任职 [color=#d9c85f]%d[/color]  可突破 [color=#d9c85f]%d[/color]  外派 [color=#d9c85f]%d[/color]  风险关注 [color=#d9c85f]%d[/color]" % [
 		alive,
 		sect.max_disciples(),
+		average_loyalty,
 		officers,
 		ready,
 		away,
@@ -267,9 +271,10 @@ func _make_disciple_row(d: DiscipleData) -> Control:
 	top.add_child(status)
 
 	var line = Label.new()
-	line.text = "%s | %s | %s | %s" % [
+	line.text = "%s | %s | %s | %s | %s" % [
 		d.position,
 		_get_task_display(d.assigned_task),
+		"忠诚%d" % d.loyalty,
 		d.specialty if d.specialty != "" else "擅长未明",
 		"、".join(d.personalities) if not d.personalities.is_empty() else "性格未明",
 	]
@@ -332,7 +337,7 @@ func _refresh_preview(sect: Resource) -> void:
 		d.sub_realm,
 		int(clampf(d.cultivation_progress * 100.0, 0.0, 100.0)),
 	])
-	_preview.append_text("职位: %s  任务: %s\n\n" % [d.position, _get_task_display(d.assigned_task)])
+	_preview.append_text("职位: %s  任务: %s  忠诚: %d\n\n" % [d.position, _get_task_display(d.assigned_task), d.loyalty])
 
 	_preview.append_text("[b]性格与判断倾向[/b]\n")
 	_preview.append_text("%s\n" % _get_personality_reading(d))
@@ -473,6 +478,7 @@ func _get_risk_score(d: Resource) -> int:
 		score += 18
 	if d.fortune < 35:
 		score += 6
+	score += int((50 - int(d.loyalty)) * 0.7)
 	if d.position != "普通弟子":
 		score -= 5
 	return clampi(score, 0, 100)
