@@ -15,6 +15,7 @@ var _recruit_panel: DiscipleRecruitPanel
 var _detail_panel: DiscipleDetailPanel
 var _recruit_btn: Button
 var _build_selector: OptionButton
+var _dashboard_box: HBoxContainer
 var _onboarding_box: VBoxContainer
 
 
@@ -27,6 +28,7 @@ func _ready() -> void:
 	EventBus.disciple_died.connect(_on_disciples_changed)
 	EventBus.game_started.connect(_on_game_started)
 	EventBus.onboarding_changed.connect(_refresh_onboarding)
+	EventBus.event_ledger_changed.connect(func(): _refresh(TimeManager.month, TimeManager.year))
 
 	var root = get_node("../../..")
 	_recruit_panel = root.get_node("DiscipleRecruitPanel")
@@ -38,7 +40,7 @@ func _ready() -> void:
 	_recruit_btn.pressed.connect(_on_recruit_pressed)
 	$Disciples.add_child(_recruit_btn)
 	$Disciples.move_child(_recruit_btn, 1)
-	_create_onboarding_box()
+	_create_dashboard_box()
 
 	if GameManager.current_sect:
 		_refresh(TimeManager.month, TimeManager.year)
@@ -55,6 +57,7 @@ func _refresh(_month: int, _year: int) -> void:
 
 	sect_name_label.text = sect.name
 	rank_label.text = _get_rank_display(sect.rank)
+	_refresh_dashboard(sect)
 	_refresh_facilities(sect)
 	_refresh_disciples_brief(sect)
 	_refresh_resources(sect)
@@ -62,12 +65,82 @@ func _refresh(_month: int, _year: int) -> void:
 	_refresh_onboarding()
 
 
-func _create_onboarding_box() -> void:
+func _create_dashboard_box() -> void:
+	_dashboard_box = HBoxContainer.new()
+	_dashboard_box.name = "DashboardCards"
+	_dashboard_box.add_theme_constant_override("separation", 12)
+	_dashboard_box.custom_minimum_size = Vector2(0, 112)
+	$SectInfo.add_child(_dashboard_box)
+
 	_onboarding_box = VBoxContainer.new()
 	_onboarding_box.name = "OnboardingObjectives"
 	_onboarding_box.add_theme_constant_override("separation", 6)
-	_onboarding_box.custom_minimum_size = Vector2(0, 150)
+	_onboarding_box.custom_minimum_size = Vector2(0, 130)
 	$SectInfo.add_child(_onboarding_box)
+
+
+func _refresh_dashboard(sect: Resource) -> void:
+	if not _dashboard_box:
+		return
+	for child in _dashboard_box.get_children():
+		child.queue_free()
+
+	var ranking = WorldController.get_player_ranking_summary()
+	var rank_text = "天下排名未明"
+	if not ranking.is_empty():
+		rank_text = "第%d/%d  综合%d" % [
+			ranking.get("rank", 0),
+			ranking.get("total", 0),
+			ranking.get("entry", {}).get("score", 0),
+		]
+		if ranking.get("score_gap", 0) > 0:
+			rank_text += "\n距上一名 %d" % ranking.get("score_gap", 0)
+
+	_dashboard_box.add_child(_make_dashboard_card(
+		"宗门态势",
+		"%s\n%s" % [_get_rank_display(sect.rank), rank_text],
+		Color(0.9, 0.78, 0.35, 1.0)
+	))
+
+	var monthly = _get_monthly_stone_projection(sect)
+	_dashboard_box.add_child(_make_dashboard_card(
+		"本月账目",
+		"灵石 %d\n预计月结 %+d" % [sect.spirit_stones, monthly],
+		Color(0.45, 0.82, 0.65, 1.0) if monthly >= 0 else Color(0.95, 0.42, 0.35, 1.0)
+	))
+
+	_dashboard_box.add_child(_make_dashboard_card(
+		"待处理",
+		"宗门纪事 %d\n持续影响 %d" % [EventController.active_events.size(), EventController.active_impacts.size()],
+		Color(0.95, 0.35, 0.28, 1.0) if EventController.active_events.size() > 0 else Color(0.72, 0.68, 0.55, 1.0)
+	))
+
+	_dashboard_box.add_child(_make_dashboard_card(
+		"建议行动",
+		_get_recommendation(sect),
+		Color(0.72, 0.86, 0.95, 1.0)
+	))
+
+
+func _make_dashboard_card(title_text: String, body_text: String, accent: Color) -> VBoxContainer:
+	var card = VBoxContainer.new()
+	card.custom_minimum_size = Vector2(0, 96)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_constant_override("separation", 4)
+
+	var title = Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", accent)
+	card.add_child(title)
+
+	var body = Label.new()
+	body.text = body_text
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.add_theme_font_size_override("font_size", 15)
+	body.add_theme_color_override("font_color", Color(0.82, 0.78, 0.66, 1.0))
+	card.add_child(body)
+	return card
 
 
 func _refresh_onboarding() -> void:
@@ -402,6 +475,23 @@ func _get_monthly_stone_projection(sect: Resource) -> int:
 		if d.alive and d.assigned_task in ["alchemy", "crafting"]:
 			upkeep += DiscipleController.TASK_COSTS.get(d.assigned_task, 0)
 	return income - upkeep
+
+
+func _get_recommendation(sect: Resource) -> String:
+	if EventController.active_events.size() > 0:
+		return "先处理宗门纪事"
+	if OnboardingController.get_summary().get("completed", 0) < OnboardingController.get_summary().get("total", 0):
+		var next = OnboardingController.get_next_objective()
+		return "推进目标：%s" % next.get("title", "掌门初任")
+	if _get_monthly_stone_projection(sect) < 0:
+		return "安排弟子赚取灵石"
+	for d in sect.disciples:
+		if d.alive and d.cultivation_progress >= 1.0:
+			return "%s 可尝试突破" % d.disciple_name
+	var remaining = sect.max_facilities() - sect.facilities.size()
+	if remaining > 0:
+		return "可继续扩建宗门设施"
+	return "查看天下榜寻找短板"
 
 
 func _format_resource_dict(data: Dictionary) -> String:

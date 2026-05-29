@@ -12,6 +12,7 @@ extends Control
 @onready var advance_month_button: Button = $TopBar/AdvanceMonthButton
 
 var _event_ledger_badge: Label
+var _event_ledger_btn: Button
 
 
 func _ready() -> void:
@@ -23,81 +24,76 @@ func _ready() -> void:
 	EventBus.disciple_broken_through.connect(_on_disciple_breakthrough)
 	EventBus.event_ledger_changed.connect(_refresh_event_badge)
 	advance_month_button.pressed.connect(_on_advance_month)
-
-	# 存档按钮
-	var save_btn = Button.new()
-	save_btn.text = "存档"
-	save_btn.add_theme_font_size_override("font_size", 18)
-	save_btn.pressed.connect(_on_save_pressed)
-	$TopBar.add_child(save_btn)
-	$TopBar.move_child(save_btn, $TopBar.get_child_count() - 2)
-
-	# 外交按钮
-	var diplo_btn = Button.new()
-	diplo_btn.text = "天下榜"
-	diplo_btn.add_theme_font_size_override("font_size", 18)
-	diplo_btn.pressed.connect(_on_diplomacy_pressed)
-	$TopBar.add_child(diplo_btn)
-	$TopBar.move_child(diplo_btn, $TopBar.get_child_count() - 2)
-
-	# 炼丹炼器按钮
-	var alchemy_btn = Button.new()
-	alchemy_btn.text = "炼丹炼器"
-	alchemy_btn.add_theme_font_size_override("font_size", 18)
-	alchemy_btn.pressed.connect(_on_alchemy_pressed)
-	$TopBar.add_child(alchemy_btn)
-	$TopBar.move_child(alchemy_btn, $TopBar.get_child_count() - 2)
-
-	# 秘境探索按钮
-	var dungeon_btn = Button.new()
-	dungeon_btn.text = "秘境探索"
-	dungeon_btn.add_theme_font_size_override("font_size", 18)
-	dungeon_btn.pressed.connect(_on_dungeon_pressed)
-	$TopBar.add_child(dungeon_btn)
-	$TopBar.move_child(dungeon_btn, $TopBar.get_child_count() - 2)
-
-	# 宗门全景按钮
-	var sectview_btn = Button.new()
-	sectview_btn.text = "宗门全景"
-	sectview_btn.add_theme_font_size_override("font_size", 18)
-	sectview_btn.pressed.connect(_on_sectview_pressed)
-	$TopBar.add_child(sectview_btn)
-	$TopBar.move_child(sectview_btn, $TopBar.get_child_count() - 2)
-
-	# 仓库按钮
-	var warehouse_btn = Button.new()
-	warehouse_btn.text = "仓库"
-	warehouse_btn.add_theme_font_size_override("font_size", 18)
-	warehouse_btn.pressed.connect(_on_warehouse_pressed)
-	$TopBar.add_child(warehouse_btn)
-	$TopBar.move_child(warehouse_btn, $TopBar.get_child_count() - 2)
-
-	# 宗门纪事按钮
-	var ledger_btn = Button.new()
-	ledger_btn.text = "宗门纪事"
-	ledger_btn.add_theme_font_size_override("font_size", 18)
-	ledger_btn.pressed.connect(_on_event_ledger_pressed)
-	$TopBar.add_child(ledger_btn)
-	$TopBar.move_child(ledger_btn, $TopBar.get_child_count() - 2)
-
-	_event_ledger_badge = Label.new()
-	_event_ledger_badge.text = "●"
-	_event_ledger_badge.visible = false
-	_event_ledger_badge.add_theme_font_size_override("font_size", 18)
-	_event_ledger_badge.add_theme_color_override("font_color", Color(1.0, 0.12, 0.08, 1.0))
-	$TopBar.add_child(_event_ledger_badge)
-	$TopBar.move_child(_event_ledger_badge, $TopBar.get_child_count() - 2)
-
-	# 修真史记按钮
-	var lore_btn = Button.new()
-	lore_btn.text = "修真史记"
-	lore_btn.add_theme_font_size_override("font_size", 18)
-	lore_btn.pressed.connect(_on_lore_pressed)
-	$TopBar.add_child(lore_btn)
-	$TopBar.move_child(lore_btn, $TopBar.get_child_count() - 2)
+	_build_side_nav()
+	if main_tab_container:
+		main_tab_container.tabs_visible = false
 
 	_refresh_display(TimeManager.month, TimeManager.year)
 	_refresh_event_badge()
+
+
+func _build_side_nav() -> void:
+	var panel = PanelContainer.new()
+	panel.name = "SideNav"
+	panel.position = Vector2(10, 60)
+	panel.size = Vector2(165, 1010)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.07, 0.055, 0.04, 0.94)
+	style.border_color = Color(0.42, 0.34, 0.18, 0.85)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+
+	var nav = VBoxContainer.new()
+	nav.add_theme_constant_override("separation", 8)
+	nav.set_anchors_preset(Control.PRESET_FULL_RECT)
+	nav.offset_left = 10
+	nav.offset_top = 10
+	nav.offset_right = -10
+	nav.offset_bottom = -10
+	panel.add_child(nav)
+
+	var title = Label.new()
+	title.text = "宗门"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", Color(0.92, 0.82, 0.48, 1.0))
+	nav.add_child(title)
+
+	nav.add_child(_make_nav_button("掌门总览", func(): _select_tab(0)))
+	nav.add_child(_make_nav_button("弟子名册", func(): _select_tab(1)))
+	nav.add_child(_make_nav_button("天下地图", func(): _select_tab(2)))
+	nav.add_child(HSeparator.new())
+
+	_event_ledger_btn = _make_nav_button("宗门纪事", _on_event_ledger_pressed)
+	nav.add_child(_event_ledger_btn)
+	nav.add_child(_make_nav_button("天下榜", _on_diplomacy_pressed))
+	nav.add_child(_make_nav_button("宗门全景", _on_sectview_pressed))
+	nav.add_child(_make_nav_button("秘境探索", _on_dungeon_pressed))
+	nav.add_child(_make_nav_button("炼丹炼器", _on_alchemy_pressed))
+	nav.add_child(_make_nav_button("仓库", _on_warehouse_pressed))
+	nav.add_child(_make_nav_button("修真史记", _on_lore_pressed))
+
+	var spacer = Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	nav.add_child(spacer)
+	nav.add_child(_make_nav_button("存档", _on_save_pressed))
+
+
+func _make_nav_button(text: String, callback: Callable) -> Button:
+	var btn = Button.new()
+	btn.text = text
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.custom_minimum_size = Vector2(0, 38)
+	btn.add_theme_font_size_override("font_size", 17)
+	btn.pressed.connect(callback)
+	return btn
+
+
+func _select_tab(index: int) -> void:
+	if main_tab_container and index >= 0 and index < main_tab_container.get_tab_count():
+		main_tab_container.current_tab = index
 
 
 func _refresh_display(_month: int, _year: int) -> void:
@@ -191,6 +187,6 @@ func _get_rank_name(rank: int) -> String:
 
 
 func _refresh_event_badge() -> void:
-	if not _event_ledger_badge:
-		return
-	_event_ledger_badge.visible = EventController.unread_event_count > 0
+	if _event_ledger_btn:
+		var count = EventController.unread_event_count
+		_event_ledger_btn.text = "宗门纪事" if count == 0 else "● 宗门纪事"
