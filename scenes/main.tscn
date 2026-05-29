@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://dmainscene001"]
+[gd_scene load_steps=17 format=3 uid="uid://dmainscene001"]
 
 [ext_resource type="Script" path="res://src/ui/game_hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://src/ui/sect_overview.gd" id="2_overview"]
@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://src/ui/warehouse_panel.gd" id="12_warehouse"]
 [ext_resource type="Script" path="res://src/ui/sect_view_panel.gd" id="13_sectview"]
 [ext_resource type="Script" path="res://src/ui/event_ledger_panel.gd" id="14_eventledger"]
+[ext_resource type="Script" path="res://src/ui/disciple_roster_panel.gd" id="15_roster"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -171,17 +172,7 @@ text = "当前门规: 无"
 [node name="DisciplePanel" type="Control" parent="MainView/TabContainer"]
 layout_mode = 2
 visible = false
-
-[node name="DisciplePanelPlaceholder" type="Label" parent="MainView/TabContainer/DisciplePanel"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-text = "弟子详细面板 — Phase 4 实现"
-horizontal_alignment = 1
-theme_override_font_sizes/font_size = 24
+script = ExtResource("15_roster")
 
 [node name="WorldMap" type="Control" parent="MainView/TabContainer"]
 layout_mode = 2
