@@ -39,6 +39,7 @@ signal equipment_forged(equipment_id: String, quality: int, crafter_id: String)
 ## 事件信号
 signal random_event_triggered(event_id: String)
 signal event_choice_made(event_id: String, choice: int)
+signal event_ledger_changed
 
 ## 外交信号
 signal faction_relation_changed(faction_id: String, old_value: int, new_value: int)

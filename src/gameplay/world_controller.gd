@@ -11,6 +11,7 @@ var region_control: Dictionary = {}  # {region_id: faction_name}
 
 func _ready() -> void:
 	_initialize_npc_factions()
+	_refresh_world_incidents()
 
 
 func process_npc_turn() -> void:
@@ -20,6 +21,7 @@ func process_npc_turn() -> void:
 			continue
 		_npc_annual_decision(faction)
 	_update_region_control()
+	_refresh_world_incidents()
 
 
 func _npc_annual_decision(sect: FactionData) -> void:
@@ -136,6 +138,52 @@ func _update_region_control() -> void:
 
 func get_region_controller(region_id: String) -> String:
 	return region_control.get(region_id, "")
+
+
+func get_world_incidents() -> Array[Dictionary]:
+	return world_events.duplicate(true)
+
+
+func _refresh_world_incidents() -> void:
+	world_events.clear()
+
+	world_events.append({
+		"id": "demon_front_sealing_cave",
+		"type": "人魔战线",
+		"region_id": "sealing_cave",
+		"name": "封魔洞魔气外泄",
+		"severity": "high",
+		"description": "封魔洞一带魔气比往年更重，正魔双方都在派人查探。暂不会强制推动主线，但会成为后续线索来源。",
+	})
+
+	world_events.append({
+		"id": "ancient_battlefield_restless",
+		"type": "古战场异动",
+		"region_id": "ancient_battlefield",
+		"name": "古战场怨魂躁动",
+		"severity": "medium",
+		"description": "古战场夜间常有残剑鸣动，像是在回应某种远古封印。",
+	})
+
+	if TimeManager.year >= 2:
+		world_events.append({
+			"id": "beast_tide_myriad_beast",
+			"type": "妖兽入侵",
+			"region_id": "myriad_beast_mt",
+			"name": "万妖山妖潮南移",
+			"severity": "medium",
+			"description": "妖兽群离开旧巢向中州外围迁徙，疑似受到魔气或高阶妖王驱赶。",
+		})
+
+	if TimeManager.year >= 3:
+		world_events.append({
+			"id": "faction_defection_trace",
+			"type": "宗门疑云",
+			"region_id": "star_pavilion",
+			"name": "星辰阁分阁星盘失准",
+			"severity": "low",
+			"description": "星辰阁分阁封锁山门，外界传闻他们曾在夜间接待魔域来客。",
+		})
 
 
 func get_power_rankings() -> Array:

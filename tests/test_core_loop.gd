@@ -145,7 +145,7 @@ func test_event_triggering() -> void:
 
 	var events = EventController.roll_events()
 	# 可能返回0-3个事件
-	assert_that(events.size() <= 3, "每回合最多3个事件")
+	assert_that(events.size() <= 1, "每回合最多1个事件")
 	print("  触发 %d 个事件" % events.size())
 
 	for event in events:

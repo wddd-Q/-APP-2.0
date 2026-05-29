@@ -421,6 +421,21 @@ func _load_world_lore() -> void:
 			"content": "千年前的正魔大决战发生在今日的西南荒漠。那一战打得天昏地暗，方圆千里化为焦土。战后，无数法宝、功法散落于战场废墟之中。数百年来，寻宝者络绎不绝，但据说最珍贵的宝物至今未被发现——它藏于古战场深处，被万年怨魂守护着。",
 			"unlock_condition": "explore_dungeon:ancient_battlefield",
 		},
+		"story_01": {
+			"category": "暗线线索", "title": "苍梧旧约的裂纹", "era_tag": 4,
+			"content": "苍梧旧约并非一纸盟书那么简单。旧约签订时，正魔双方曾以十二处地脉为钉，将古战场残留的魔气压回封魔洞。如今封魔洞魔气外泄，意味着其中至少一处地脉正在失衡。此事尚不足以掀起大战，却足以让各宗暗中试探。",
+			"unlock_condition": "world_incident:demon_front_sealing_cave",
+		},
+		"story_02": {
+			"category": "暗线线索", "title": "星盘失准", "era_tag": 4,
+			"content": "星辰阁向来以观星推演立足，分阁星盘却在近日连续失准。坊间传言，有人故意遮蔽天机，也有人说星辰阁内部有人借魔域秘法窥探封印。真假难辨，但一个擅长推演的宗门突然沉默，本身就是异兆。",
+			"unlock_condition": "world_incident:faction_defection_trace",
+		},
+		"story_03": {
+			"category": "暗线线索", "title": "本门山门旧痕", "era_tag": 4,
+			"content": "本门山门虽破败，却有几处阵基深埋地下，材质远超寻常小宗门所能负担。若将这些阵基位置连成一线，隐约指向南方封魔洞。或许这座山门曾是某个大阵的边角，也或许只是旧时代遗留的巧合。",
+			"unlock_condition": "discover_region:player_home",
+		},
 	}
 
 

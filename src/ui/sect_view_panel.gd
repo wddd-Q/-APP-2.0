@@ -3,6 +3,8 @@ extends Control
 ## 宗门鸟瞰视图 — 显示设施布局、弟子、资源概览
 
 
+const SECT_MAP_PATH := "res://assets/textures/maps/sect_map.png"
+
 const BUILDING_COLORS: Dictionary = {
 	"cultivation_chamber": Color(0.3, 0.5, 0.8, 1.0),
 	"alchemy_hall": Color(0.9, 0.3, 0.2, 1.0),
@@ -31,6 +33,9 @@ const LAYOUT_POSITIONS: Dictionary = {
 }
 
 var _info_label: RichTextLabel
+var _canvas: Control
+var _map_texture: Texture2D
+var _selected_facility_type: String = ""
 
 
 func _ready() -> void:
@@ -43,6 +48,8 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	_map_texture = _load_texture(SECT_MAP_PATH)
+
 	var bg = ColorRect.new()
 	bg.color = Color(0, 0, 0, 0.6)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -90,12 +97,14 @@ func _build_ui() -> void:
 	hbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(hbox)
 
-	var canvas = Control.new()
-	canvas.custom_minimum_size = Vector2(520, 480)
-	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	canvas.draw.connect(_on_draw.bind(canvas))
-	hbox.add_child(canvas)
+	_canvas = Control.new()
+	_canvas.custom_minimum_size = Vector2(520, 480)
+	_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_canvas.mouse_filter = Control.MOUSE_FILTER_STOP
+	_canvas.draw.connect(_on_draw.bind(_canvas))
+	_canvas.gui_input.connect(_on_canvas_input)
+	hbox.add_child(_canvas)
 
 	# 右侧信息
 	_info_label = RichTextLabel.new()
@@ -119,6 +128,8 @@ func open_panel() -> void:
 func _refresh() -> void:
 	if _info_label:
 		_update_info()
+	if _canvas:
+		_canvas.queue_redraw()
 
 
 func _update_info() -> void:
@@ -130,6 +141,10 @@ func _update_info() -> void:
 	_info_label.append_text("品级: %d品\n" % sect.rank)
 	_info_label.append_text("声望: %d\n" % sect.prestige)
 	_info_label.append_text("灵石: %d\n\n" % sect.spirit_stones)
+
+	if _selected_facility_type != "":
+		_add_selected_facility_info(sect)
+
 	_info_label.append_text("[b]已建设施:[/b]\n")
 	for f in sect.facilities:
 		var tmpl = DataRegistry.facility_templates.get(f.facility_type, {})
@@ -145,8 +160,12 @@ func _on_draw(canvas: Control) -> void:
 
 	var center = Vector2(canvas.size.x / 2.0, canvas.size.y / 2.0)
 
-	# 绘制地面
-	canvas.draw_rect(Rect2(Vector2.ZERO, canvas.size), Color(0.15, 0.25, 0.12, 1.0))
+	# AI 绘制底图，设施状态仍由游戏数据叠加。
+	if _map_texture:
+		canvas.draw_texture_rect(_map_texture, Rect2(Vector2.ZERO, canvas.size), false)
+		canvas.draw_rect(Rect2(Vector2.ZERO, canvas.size), Color(0, 0, 0, 0.16))
+	else:
+		canvas.draw_rect(Rect2(Vector2.ZERO, canvas.size), Color(0.15, 0.25, 0.12, 1.0))
 
 	# 宗门中心地基
 	canvas.draw_circle(center, 40, Color(0.3, 0.3, 0.3, 0.7))
@@ -176,6 +195,8 @@ func _on_draw(canvas: Control) -> void:
 			continue
 		var bldg_pos = center + pos_offset
 		var bldg_color = BUILDING_COLORS.get(f.facility_type, Color.GRAY)
+		if f.facility_type == _selected_facility_type:
+			bldg_color = bldg_color.lightened(0.35)
 		var tmpl = DataRegistry.facility_templates.get(f.facility_type, {})
 		var size = 16.0 + f.level * 4.0  # 等级越高建筑越大
 
@@ -190,6 +211,9 @@ func _on_draw(canvas: Control) -> void:
 		# 边框
 		canvas.draw_rect(Rect2(bldg_pos - Vector2(size, size), Vector2(size * 2, size * 2)),
 			bldg_color.darkened(0.3), false, 2.0)
+
+		if f.facility_type == _selected_facility_type:
+			canvas.draw_circle(bldg_pos, size + 9, Color(1.0, 0.85, 0.25, 0.35), false, 3.0)
 
 		# 等级星标
 		var stars = ""
@@ -231,6 +255,52 @@ func _on_draw(canvas: Control) -> void:
 			canvas.draw_circle(center, 60.0 + i * 30,
 				Color(0.3, 0.6, 1.0, glow_alpha), false, 1.5)
 		canvas.draw_circle(center, 50, Color(0.3, 0.7, 1.0, glow_alpha * 2))
+
+
+func _on_canvas_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+		_selected_facility_type = _find_facility_at(ev.position)
+		_refresh()
+
+
+func _find_facility_at(pos: Vector2) -> String:
+	var sect = GameManager.current_sect
+	if not sect or not _canvas:
+		return ""
+	var center = Vector2(_canvas.size.x / 2.0, _canvas.size.y / 2.0)
+	for f in sect.facilities:
+		var pos_offset = LAYOUT_POSITIONS.get(f.facility_type, Vector2.ZERO)
+		if pos_offset == Vector2.ZERO:
+			continue
+		var bldg_pos = center + pos_offset
+		var hit_radius = 24.0 + f.level * 4.0
+		if pos.distance_to(bldg_pos) <= hit_radius:
+			return f.facility_type
+	return ""
+
+
+func _add_selected_facility_info(sect: Resource) -> void:
+	var facility = sect.get_facility(_selected_facility_type)
+	if not facility:
+		return
+	var tmpl = DataRegistry.facility_templates.get(_selected_facility_type, {})
+	_info_label.append_text("[b]当前选中:[/b]\n")
+	_info_label.append_text("%s Lv.%d\n" % [tmpl.get("name", _selected_facility_type), facility.level])
+	_info_label.append_text("%s\n" % tmpl.get("description", ""))
+	var maintenance = tmpl.get("maintenance", {}).get(facility.level, 0)
+	if maintenance > 0:
+		_info_label.append_text("维护: %d灵石/月\n" % maintenance)
+	_info_label.append_text("\n")
+
+
+func _load_texture(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	var img = Image.new()
+	var err = img.load(ProjectSettings.globalize_path(path))
+	if err == OK:
+		return ImageTexture.create_from_image(img)
+	return null
 
 
 func _on_data_changed(_a = null, _b = null, _c = null) -> void:

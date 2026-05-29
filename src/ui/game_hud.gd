@@ -69,6 +69,14 @@ func _ready() -> void:
 	$TopBar.add_child(warehouse_btn)
 	$TopBar.move_child(warehouse_btn, $TopBar.get_child_count() - 2)
 
+	# 宗门纪事按钮
+	var ledger_btn = Button.new()
+	ledger_btn.text = "宗门纪事"
+	ledger_btn.add_theme_font_size_override("font_size", 18)
+	ledger_btn.pressed.connect(_on_event_ledger_pressed)
+	$TopBar.add_child(ledger_btn)
+	$TopBar.move_child(ledger_btn, $TopBar.get_child_count() - 2)
+
 	# 修真史记按钮
 	var lore_btn = Button.new()
 	lore_btn.text = "修真史记"
@@ -131,6 +139,10 @@ func _on_sectview_pressed() -> void:
 
 func _on_warehouse_pressed() -> void:
 	get_parent().get_node("WarehousePanel").open_panel()
+
+
+func _on_event_ledger_pressed() -> void:
+	get_parent().get_node("EventLedgerPanel").open_panel()
 
 
 func _on_lore_pressed() -> void:

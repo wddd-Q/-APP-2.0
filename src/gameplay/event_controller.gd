@@ -7,36 +7,62 @@ var active_events: Array[Dictionary] = []
 var event_history: Array[String] = []
 var event_cooldowns: Dictionary = {}  # {event_id: 剩余冷却月数}
 var event_chain_state: Dictionary = {}
+var event_records: Array[Dictionary] = []
+var active_impacts: Array[Dictionary] = []
+var months_since_event: int = 0
+
+const MONTHLY_EVENT_CHANCE := 0.35
+const PITY_EVENT_MONTHS := 4
+const MAX_EVENT_RECORDS := 80
 
 
 func _ready() -> void:
+	EventBus.game_started.connect(reset_state)
 	_initialize_event_pool()
 
 
+func reset_state() -> void:
+	active_events.clear()
+	event_history.clear()
+	event_cooldowns.clear()
+	event_chain_state.clear()
+	event_records.clear()
+	active_impacts.clear()
+	months_since_event = 0
+	EventBus.event_ledger_changed.emit()
+
+
 func roll_events() -> Array[Dictionary]:
-	"""每月结算时调用，随机触发0-3个事件"""
+	"""每月结算时调用，随机触发0-1个经营事件"""
 	_process_cooldowns()
+	_process_active_impacts()
 
 	var triggered: Array[Dictionary] = []
+	if not active_events.is_empty():
+		return triggered
+
 	var available = _get_available_events()
 
 	if available.is_empty():
+		months_since_event += 1
 		return triggered
 
-	var count = randi() % 4  # 0, 1, 2, 3
-	for i in range(count):
-		if available.is_empty():
-			break
-		var idx = randi() % available.size()
-		var event = available.pop_at(idx)
-		triggered.append(event)
+	var should_trigger = randf() < MONTHLY_EVENT_CHANCE or months_since_event >= PITY_EVENT_MONTHS
+	if not should_trigger:
+		months_since_event += 1
+		return triggered
 
-		event_cooldowns[event["id"]] = event.get("cooldown", 3)
-		event_history.append(event["id"])
+	var idx = randi() % available.size()
+	var picked_event = available[idx]
+	triggered.append(picked_event)
+
+	event_cooldowns[picked_event["id"]] = picked_event.get("cooldown", 3)
+	event_history.append(picked_event["id"])
+	months_since_event = 0
 
 	active_events = triggered
-	for event in triggered:
-		EventBus.random_event_triggered.emit(event["id"])
+	for triggered_event in triggered:
+		EventBus.random_event_triggered.emit(triggered_event["id"])
 	return triggered
 
 
@@ -57,8 +83,12 @@ func resolve_choice(event_id: String, choice: int) -> Dictionary:
 			var tag = selected["chain_tag"]
 			event_chain_state[tag] = TimeManager.year
 
+		if not result.get("blocked", false):
+			_record_resolved_event(event, selected, result)
+
 		EventBus.event_choice_made.emit(event_id, choice)
-		active_events.erase(event)
+		if not result.get("blocked", false):
+			active_events.erase(event)
 		return result
 
 	return {"error": "事件不存在"}
@@ -256,6 +286,128 @@ func _process_cooldowns() -> void:
 			expired.append(event_id)
 	for event_id in expired:
 		event_cooldowns.erase(event_id)
+
+
+func _process_active_impacts() -> void:
+	if active_impacts.is_empty():
+		return
+
+	var changed = false
+	var expired: Array[Dictionary] = []
+	for impact in active_impacts:
+		impact["months_remaining"] = int(impact.get("months_remaining", 0)) - 1
+		if impact["months_remaining"] <= 0:
+			expired.append(impact)
+		changed = true
+
+	for impact in expired:
+		active_impacts.erase(impact)
+
+	if changed:
+		EventBus.event_ledger_changed.emit()
+
+
+func _record_resolved_event(event: Dictionary, selected: Dictionary, result: Dictionary) -> void:
+	var impact = _make_impact_summary(event, selected, result)
+	var record = {
+		"record_id": "%s_%d_%d_%d" % [event.get("id", "event"), TimeManager.year, TimeManager.month, event_records.size()],
+		"event_id": event.get("id", ""),
+		"title": event.get("name", "事件"),
+		"scope": _get_scope_label(event.get("scope", "sect")),
+		"rarity": _get_rarity_label(event.get("rarity", "common")),
+		"date": TimeManager.get_date_string(),
+		"choice": selected.get("label", "未记录"),
+		"messages": result.get("messages", []).duplicate(),
+		"immediate": _summarize_effects(result.get("effects_applied", {}), result.get("messages", [])),
+		"long_term": impact.get("summary", "无持续影响"),
+		"months_remaining": impact.get("months", 0),
+		"category": event.get("category", "经营事件"),
+		"is_story": event.get("is_story", false),
+	}
+	event_records.push_front(record)
+	if event_records.size() > MAX_EVENT_RECORDS:
+		event_records.resize(MAX_EVENT_RECORDS)
+
+	if int(impact.get("months", 0)) > 0:
+		active_impacts.push_front({
+			"record_id": record["record_id"],
+			"title": record["title"],
+			"date": record["date"],
+			"summary": impact["summary"],
+			"months_remaining": impact["months"],
+			"severity": impact.get("severity", "neutral"),
+		})
+
+	EventBus.event_ledger_changed.emit()
+
+
+func _make_impact_summary(event: Dictionary, selected: Dictionary, result: Dictionary) -> Dictionary:
+	if selected.has("impact"):
+		return {
+			"summary": selected.get("impact", "无持续影响"),
+			"months": selected.get("impact_months", 0),
+			"severity": selected.get("impact_severity", "neutral"),
+		}
+
+	var effects = result.get("effects_applied", {})
+	var action = effects.get("action", "")
+	match action:
+		"combat_beast":
+			return {"summary": "山门周边妖兽被震慑，短期内灵田较安稳。", "months": 3, "severity": "good"}
+		"evacuate":
+			return {"summary": "弟子避战保全实力，但附近妖兽活动仍未平息。", "months": 2, "severity": "warning"}
+		"guard_caravan":
+			return {"summary": "商队愿意继续往来，坊市传闻对本门更友善。", "months": 4, "severity": "good"}
+		"open_trade":
+			return {"summary": "近期物资流通增加，仓库获得一次性补给。", "months": 1, "severity": "neutral"}
+		"force_cultivation":
+			return {"summary": "门内修炼气氛紧绷，突破收益与心魔风险并存。", "months": 2, "severity": "warning"}
+		"safe_cultivation", "steady_breakthrough", "temper_foundation":
+			return {"summary": "弟子心态趋稳，闭关与突破反馈已记入名册。", "months": 3, "severity": "good"}
+		"mediate", "punish":
+			return {"summary": "门内秩序得到处理，弟子会观察掌门后续赏罚。", "months": 2, "severity": "neutral"}
+		"record_generation_oath", "reward_generation_oath":
+			return {"summary": "初代弟子的归属感增强，此事成为宗门早期记忆。", "months": 6, "severity": "good"}
+		_:
+			return {"summary": "此事已归档，目前没有持续影响。", "months": 0, "severity": "neutral"}
+
+
+func _summarize_effects(effects: Dictionary, messages: Array) -> String:
+	if not messages.is_empty():
+		return "；".join(messages)
+	var parts: Array[String] = []
+	if effects.has("spirit_stones"):
+		parts.append("灵石 %+d" % effects["spirit_stones"])
+	if effects.has("prestige"):
+		parts.append("声望 %+d" % effects["prestige"])
+	if effects.has("loyalty"):
+		parts.append("弟子忠诚 %+d" % effects["loyalty"])
+	if effects.has("sect_order"):
+		parts.append("宗门秩序 %+d" % effects["sect_order"])
+	if parts.is_empty():
+		return "无直接数值变化"
+	return "；".join(parts)
+
+
+func _get_scope_label(scope: String) -> String:
+	var labels = {
+		"sect": "宗门",
+		"disciple": "弟子",
+		"region": "区域",
+		"world": "天下",
+	}
+	return labels.get(scope, scope)
+
+
+func _get_rarity_label(rarity: String) -> String:
+	var labels = {
+		"common": "常见",
+		"uncommon": "不凡",
+		"rare": "稀有",
+		"epic": "史诗",
+		"legendary": "传说",
+	}
+	return labels.get(rarity, rarity)
 
 
 func _apply_event_effects(effects: Dictionary) -> Dictionary:
