@@ -1348,11 +1348,9 @@ func _random_root_quality() -> String:
 
 func _random_elements() -> Array:
 	var all = [0, 1, 2, 3, 4]
+	all.shuffle()
 	var count = 1 + randi() % 5
-	var result: Array = []
-	for i in range(count):
-		result.append(all[randi() % all.size()])
-	return result
+	return all.slice(0, count)
 
 
 func _random_event_personalities() -> Array:

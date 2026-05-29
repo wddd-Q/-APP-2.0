@@ -69,6 +69,13 @@ func _load_facilities() -> void:
 			"maintenance": {1: 10, 2: 30, 3: 80},
 			"alchemy_bonus": {1: 0.1, 2: 0.25, 3: 0.4},
 		},
+		"crafting_hall": {
+			"name": "炼器坊",
+			"max_level": 3,
+			"build_cost": {1: 200, 2: 800, 3: 3000},
+			"maintenance": {1: 10, 2: 30, 3: 80},
+			"crafting_bonus": {1: 0.1, 2: 0.25, 3: 0.4},
+		},
 		"scripture_pavilion": {
 			"name": "藏经阁",
 			"max_level": 3,

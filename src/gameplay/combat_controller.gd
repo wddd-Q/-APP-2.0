@@ -9,11 +9,11 @@ const CombatResult = preload("res://src/core/data/combat_result.gd")
 func simulate_battle(attacker_id: String, defender_id: String, attacker_sect: FactionData, defender_sect: FactionData) -> CombatResult:
 	var attacker_power = _calculate_faction_power(attacker_sect)
 	var defender_power = _calculate_faction_power(defender_sect)
-	var power_ratio = float(attacker_power) / maxi(defender_power, 1)
 
 	# 防守方有地形+护山大阵加成
 	if defender_id != "wild_beast":  # 非妖兽
 		defender_power = int(defender_power * 1.3)
+	var power_ratio = float(attacker_power) / maxi(defender_power, 1)
 
 	var result = CombatResult.new()
 	result.attacker_id = attacker_id
@@ -65,7 +65,10 @@ func calculate_disciple_combat_power(disciple: DiscipleData) -> int:
 		power *= (1.0 + arena_bonus)
 
 	# 功法加成
+	power *= DiscipleController.get_technique_cultivation_bonus(disciple)
+
 	# 装备加成
+	power *= DiscipleController.get_equipment_combat_bonus(disciple)
 
 	return int(power)
 

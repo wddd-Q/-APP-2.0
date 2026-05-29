@@ -9,7 +9,7 @@ const ItemData = preload("res://src/core/data/item_data.gd")
 
 const SAVE_DIR := "user://saves/"
 const SAVE_EXT := ".json"
-const SAVE_VERSION := "0.1.0"
+const SAVE_VERSION := "0.2.0"
 
 
 func _ready() -> void:
@@ -49,11 +49,13 @@ func load_game(path: String) -> Resource:
 	if json == null:
 		return null
 
-	var version = json.get("version", "")
+	var version = json.get("version", "0.0.0")
 	if version != SAVE_VERSION:
-		push_warning("存档版本不匹配: %s vs %s" % [version, SAVE_VERSION])
+		push_warning("存档版本升级: %s -> %s" % [version, SAVE_VERSION])
+		json = _migrate_save_data(json, version)
 
 	return _deserialize_sect(json)
+
 
 
 func get_save_slots() -> Array[Dictionary]:
@@ -84,6 +86,33 @@ func get_save_slots() -> Array[Dictionary]:
 
 
 ## === 序列化 ===
+
+
+func _migrate_save_data(data: Dictionary, from_version: String) -> Dictionary:
+	"""根据版本号逐步迁移存档数据"""
+	var migrated = data.duplicate(true)
+
+	# 0.1.0 -> 0.2.0: 新增弟子受伤标记
+	if from_version == "0.1.0":
+		for dd in migrated.get("disciples", []):
+			if not dd.has("injured"):
+				dd["injured"] = false
+		if not migrated.has("equipment"):
+			for dd in migrated.get("disciples", []):
+				if not dd.has("equipment"):
+					dd["equipment"] = []
+		if not migrated.has("techniques"):
+			for dd in migrated.get("disciples", []):
+				if not dd.has("techniques"):
+					dd["techniques"] = []
+		migrated["version"] = "0.2.0"
+
+	# 未来版本迁移在此处添加:
+	# if from_version == "0.2.0":
+	#     ... migrate to 0.3.0 ...
+	#     migrated["version"] = "0.3.0"
+
+	return migrated
 
 func _serialize_sect(sect: Resource) -> Dictionary:
 	var data: Dictionary = {}
@@ -138,6 +167,7 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 			"skills": d.skills,
 			"task": d.assigned_task,
 			"location": d.location,
+			"injured": d.injured,
 			"personalities": d.personalities,
 			"specialty": d.specialty,
 			"origin_story": d.origin_story,
@@ -234,6 +264,7 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 		d.skills = dd.get("skills", {})
 		d.assigned_task = dd.get("task", "")
 		d.location = dd.get("location", "sect")
+		d.injured = dd.get("injured", false)
 		d.personalities = dd.get("personalities", [])
 		d.specialty = dd.get("specialty", "")
 		d.origin_story = dd.get("origin_story", "")

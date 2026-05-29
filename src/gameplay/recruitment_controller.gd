@@ -102,6 +102,7 @@ func recruit(candidate: Dictionary) -> DiscipleData:
 	d.add_memory("宗门历%d年 %s通过招徒令拜入宗门。" % [TimeManager.year, d.disciple_name])
 	if d.origin_story != "":
 		d.add_memory("入门来历：%s" % d.origin_story)
+	_create_initial_relationships(d, sect)
 	EventBus.disciple_recruited.emit(d.disciple_id)
 	EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)
 	return d
@@ -231,3 +232,44 @@ func _initial_loyalty(personalities: Array) -> int:
 	if "阴狠" in personalities or "孤傲" in personalities:
 		value -= 7
 	return clampi(value, 20, 95)
+
+
+func _create_initial_relationships(new_disciple: DiscipleData, sect: Resource) -> void:
+	var existing = sect.disciples.duplicate()
+	existing.erase(new_disciple)
+	if existing.is_empty():
+		return
+
+	var relation_count = mini(existing.size(), 1 + randi() % 2)  # 1-2个关系
+	existing.shuffle()
+
+	for i in range(relation_count):
+		var other = existing[i]
+		var rel_type = _determine_relation_type(new_disciple, other)
+		var strength = 30 + randi() % 31  # 30-60
+
+		# 双向关系
+		new_disciple.relationships.append({"target_id": other.disciple_id, "type": rel_type, "strength": strength})
+		other.relationships.append({"target_id": new_disciple.disciple_id, "type": rel_type, "strength": strength})
+
+
+func _determine_relation_type(d1: DiscipleData, d2: DiscipleData) -> String:
+	var shared = 0
+	var opposed = 0
+	var compatible_pairs = [["勇猛", "忠诚"], ["善良", "豪爽"], ["好奇", "孤傲"], ["谨慎", "内敛"]]
+	var conflict_pairs = [["勇猛", "谨慎"], ["贪婪", "善良"], ["孤傲", "豪爽"], ["阴狠", "忠诚"]]
+
+	for p1 in d1.personalities:
+		for p2 in d2.personalities:
+			for pair in compatible_pairs:
+				if (p1 == pair[0] and p2 == pair[1]) or (p1 == pair[1] and p2 == pair[0]):
+					shared += 1
+			for pair in conflict_pairs:
+				if (p1 == pair[0] and p2 == pair[1]) or (p1 == pair[1] and p2 == pair[0]):
+					opposed += 1
+
+	if shared > opposed:
+		return ["friend", "friend", "mentor"][randi() % 3]
+	elif opposed > shared:
+		return "rival"
+	return "fellow"

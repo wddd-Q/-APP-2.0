@@ -88,9 +88,9 @@ func forge_equipment(recipe: CraftRecipeData, crafter: DiscipleData) -> Dictiona
 	success_rate *= (crafter.skills.get("crafting", 0) + 50.0) / 100.0
 
 	# 炼器坊加成
-	var craft_hall = sect.get_facility("alchemy_hall")
+	var craft_hall = sect.get_facility("crafting_hall")
 	if craft_hall:
-		var bonus = DataRegistry.facility_templates.get("alchemy_hall", {}).get("alchemy_bonus", {}).get(craft_hall.level, 0.0)
+		var bonus = DataRegistry.facility_templates.get("crafting_hall", {}).get("crafting_bonus", {}).get(craft_hall.level, 0.0)
 		success_rate *= (1.0 + bonus)
 
 	var roll = randf()

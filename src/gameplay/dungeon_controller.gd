@@ -197,6 +197,7 @@ func _resolve_expedition(exp: Dictionary) -> void:
 			if randf() < 0.3:
 				if disciple:
 					disciple.cultivation_progress = maxf(0.0, disciple.cultivation_progress - 0.2)
+					disciple.injured = true
 
 	EventBus.dungeon_expedition_finished.emit(dungeon_id, success, loot)
 

@@ -58,6 +58,7 @@ extends Resource
 @export var assigned_task: String = ""  # cultivating/alchemy/exploring/guarding/idle
 @export var position: String = "普通弟子"  # 职位
 @export var location: String = "sect"    # sect/mission/exploring/dead
+@export var injured: bool = false
 @export var life_memories: Array = []  # 关键人生事件记录 ["宗门历25年 筑基成功", ...]
 
 

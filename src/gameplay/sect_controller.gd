@@ -42,7 +42,7 @@ func upgrade_facility(type: String) -> bool:
 
 	facility.level = next_level
 	facility.is_building = true
-	facility.build_progress = 35
+	facility.build_progress = 50
 
 	EventBus.facility_upgraded.emit(type, next_level)
 	EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)

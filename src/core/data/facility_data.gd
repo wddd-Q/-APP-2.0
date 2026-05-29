@@ -17,7 +17,7 @@ func can_upgrade() -> bool:
 func _max_level() -> int:
 	var defaults = {
 		"cultivation_chamber": 3, "alchemy_hall": 3, "scripture_pavilion": 3,
-		"arena": 3, "formation_hall": 3, "spirit_beast_garden": 3,
+		"arena": 3, "formation_hall": 3, "spirit_beast_garden": 3, "crafting_hall": 3, "medical_hall": 3, "guest_quarters": 3,
 		"spirit_field": 5, "spirit_vein": 5,
 	}
 	return defaults.get(facility_type, 3)

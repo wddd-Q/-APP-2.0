@@ -60,7 +60,7 @@ func _process_all_cultivation(sect: Resource) -> void:
 	for disciple in sect.disciples:
 		if not disciple.alive:
 			continue
-		if disciple.assigned_task == "cultivating" or disciple.assigned_task == "":
+		if disciple.assigned_task == "cultivating" or disciple.assigned_task == "" or disciple.assigned_task == "idle":
 			var gained = DiscipleController.process_cultivation(disciple)
 
 			# 自动检查突破
@@ -86,8 +86,10 @@ func _process_facility_effects(sect: Resource) -> void:
 	if medical:
 		var heal_rate = DataRegistry.facility_templates["medical_hall"]["heal_rate"][medical.level]
 		for d in sect.disciples:
-			if d.alive and d.cultivation_progress < 0.0:
+			if d.alive and d.injured:
 				d.cultivation_progress = minf(1.0, d.cultivation_progress + heal_rate)
+				if d.cultivation_progress >= 0.5:
+					d.injured = false
 
 	# 灵兽园：每月产出兽材
 	var beast_garden = sect.get_facility("spirit_beast_garden")
@@ -143,6 +145,7 @@ func _process_task_costs(sect: Resource) -> void:
 			var info = DiscipleController.WORK_INCOME[d.assigned_task]
 			if randf() < info["risk"]:
 				d.cultivation_progress = maxf(0.0, d.cultivation_progress - 0.15)
+				d.injured = true
 			# 采集灵草额外获得材料
 			if d.assigned_task == "herb_gathering" and randf() < 0.4:
 				var herb_qty = 1 + randi() % 3
@@ -188,3 +191,5 @@ func _process_aging(sect: Resource) -> void:
 		var lifespan = realm_data.get("lifespan", 120)
 		if disciple.age > lifespan * 0.7:
 			disciple.talent = maxi(10, disciple.talent - 1)
+			if disciple.age > lifespan * 0.85:
+				disciple.bone_structure = maxi(10, disciple.bone_structure - 1)
