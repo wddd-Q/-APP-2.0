@@ -204,11 +204,45 @@ func _make_pending_card(event: Dictionary) -> Control:
 			var selected_idx = maxi(0, handler_selector.selected)
 			handler_id = str(handler_selector.get_item_metadata(selected_idx))
 		var choices = event.get("choices", [])
+		if choices.is_empty():
+			_add_empty_hint(choices_box, "此事件暂无可选处理方案")
+			return
+
+		var choice_selector = OptionButton.new()
+		choice_selector.add_theme_font_size_override("font_size", 14)
 		for i in range(choices.size()):
 			var choice = choices[i]
-			var choice_idx = i
-			var judgement = EventController.get_choice_judgement(event.get("id", ""), choice_idx, handler_id)
-			choices_box.add_child(_make_choice_row(event, choice, choice_idx, handler_id, judgement))
+			var judgement = EventController.get_choice_judgement(event.get("id", ""), i, handler_id)
+			choice_selector.add_item("%d. %s  [%s]" % [i + 1, choice.get("label", "选项"), judgement.get("label", "可接受")])
+			choice_selector.set_item_metadata(choice_selector.item_count - 1, i)
+		choice_selector.select(0)
+		choices_box.add_child(choice_selector)
+
+		var detail = Label.new()
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD
+		detail.add_theme_font_size_override("font_size", 13)
+		choices_box.add_child(detail)
+
+		var confirm_btn = Button.new()
+		confirm_btn.text = "确认处理所选方案"
+		confirm_btn.add_theme_font_size_override("font_size", 15)
+		choices_box.add_child(confirm_btn)
+
+		var update_choice_preview = func(_idx: int = 0) -> void:
+			var selected_choice = int(choice_selector.get_item_metadata(maxi(0, choice_selector.selected)))
+			var judgement = EventController.get_choice_judgement(event.get("id", ""), selected_choice, handler_id)
+			detail.text = "判断：%s\n%s\n\n选择方案后不会立刻结算，点击下方确认按钮才会处理。" % [
+				judgement.get("label", "可接受"),
+				judgement.get("reason", ""),
+			]
+			detail.add_theme_color_override("font_color", _get_judgement_color(int(judgement.get("score", 0))))
+
+		choice_selector.item_selected.connect(func(idx: int): update_choice_preview.call(idx))
+		confirm_btn.pressed.connect(func():
+			var selected_choice = int(choice_selector.get_item_metadata(maxi(0, choice_selector.selected)))
+			_resolve_pending_choice(event.get("id", ""), selected_choice, handler_id)
+		)
+		update_choice_preview.call()
 
 	handler_selector.item_selected.connect(func(_idx: int): rebuild_choices.call())
 	rebuild_choices.call()

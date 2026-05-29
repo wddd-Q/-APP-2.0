@@ -41,5 +41,9 @@ TextureGenerator="*res://src/ui/texture_generator.gd"
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
+window/size/min_width=1280
+window/size/min_height=720
 window/size/mode=2
 window/title="修仙：宗门风云"
+window/stretch/mode="viewport"
+window/stretch/aspect="keep"
