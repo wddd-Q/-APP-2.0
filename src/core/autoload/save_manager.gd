@@ -170,6 +170,7 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 	data["event_records"] = EventController.event_records
 	data["active_event_impacts"] = EventController.active_impacts
 	data["months_since_event"] = EventController.months_since_event
+	data["unread_event_count"] = EventController.unread_event_count
 
 	return data
 
@@ -259,6 +260,7 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 	EventController.event_records = data.get("event_records", [])
 	EventController.active_impacts = data.get("active_event_impacts", [])
 	EventController.months_since_event = data.get("months_since_event", 0)
+	EventController.unread_event_count = data.get("unread_event_count", 0)
 
 	return sect
 

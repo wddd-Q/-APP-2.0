@@ -20,6 +20,7 @@ func _ready() -> void:
 
 func open_panel() -> void:
 	visible = true
+	EventController.mark_events_read()
 	_refresh()
 
 
@@ -176,11 +177,64 @@ func _make_pending_card(event: Dictionary) -> Control:
 	desc.add_theme_font_size_override("font_size", 14)
 	card.add_child(desc)
 
-	var btn = Button.new()
-	btn.text = "查看处理"
-	btn.pressed.connect(func(): EventBus.random_event_triggered.emit(event.get("id", "")))
-	card.add_child(btn)
+	var handler_label = Label.new()
+	handler_label.text = "委派处理:"
+	handler_label.add_theme_font_size_override("font_size", 14)
+	handler_label.add_theme_color_override("font_color", Color(0.78, 0.72, 0.56, 1.0))
+	card.add_child(handler_label)
+
+	var handler_selector = OptionButton.new()
+	var handlers = EventController.get_event_handlers()
+	for handler in handlers:
+		handler_selector.add_item("%s  %s" % [handler.get("name", ""), handler.get("hint", "")])
+		handler_selector.set_item_metadata(handler_selector.item_count - 1, handler.get("id", ""))
+	card.add_child(handler_selector)
+
+	var choices_box = VBoxContainer.new()
+	choices_box.add_theme_constant_override("separation", 6)
+	card.add_child(choices_box)
+
+	var rebuild_choices = func() -> void:
+		for child in choices_box.get_children():
+			child.queue_free()
+		var handler_id = ""
+		if handler_selector.item_count > 0:
+			handler_id = str(handler_selector.get_item_metadata(handler_selector.selected))
+		var choices = event.get("choices", [])
+		for i in range(choices.size()):
+			var choice = choices[i]
+			var choice_idx = i
+			var judgement = EventController.get_choice_judgement(event.get("id", ""), choice_idx, handler_id)
+			choices_box.add_child(_make_choice_row(event, choice, choice_idx, handler_id, judgement))
+
+	handler_selector.item_selected.connect(func(_idx: int): rebuild_choices.call())
+	rebuild_choices.call()
 	return card
+
+
+func _make_choice_row(event: Dictionary, choice: Dictionary, choice_idx: int, handler_id: String, judgement: Dictionary) -> Control:
+	var row = VBoxContainer.new()
+	row.add_theme_constant_override("separation", 3)
+
+	var btn = Button.new()
+	btn.text = "%d. %s  [%s]" % [choice_idx + 1, choice.get("label", "选项"), judgement.get("label", "可接受")]
+	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	btn.add_theme_font_size_override("font_size", 14)
+	btn.pressed.connect(func(): _resolve_pending_choice(event.get("id", ""), choice_idx, handler_id))
+	row.add_child(btn)
+
+	var reason = Label.new()
+	reason.text = judgement.get("reason", "")
+	reason.autowrap_mode = TextServer.AUTOWRAP_WORD
+	reason.add_theme_font_size_override("font_size", 12)
+	reason.add_theme_color_override("font_color", _get_judgement_color(int(judgement.get("score", 0))))
+	row.add_child(reason)
+	return row
+
+
+func _resolve_pending_choice(event_id: String, choice_idx: int, handler_id: String) -> void:
+	EventController.resolve_choice(event_id, choice_idx, handler_id)
+	_refresh()
 
 
 func _make_impact_card(impact: Dictionary) -> Control:
@@ -209,6 +263,13 @@ func _make_history_card(record: Dictionary) -> Control:
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	body.add_theme_font_size_override("normal_font_size", 14)
 	body.append_text("[color=#d6c98e]%s / %s[/color]\n" % [record.get("scope", "宗门"), record.get("rarity", "常见")])
+	var handler = record.get("handler", {})
+	var judgement = record.get("handler_judgement", {})
+	if not handler.is_empty():
+		body.append_text("处理：%s（%s）" % [handler.get("name", "掌门"), handler.get("position", "掌门")])
+		if not judgement.is_empty():
+			body.append_text(" · %s" % judgement.get("label", "可接受"))
+		body.append_text("\n")
 	body.append_text("选择：%s\n" % record.get("choice", ""))
 	body.append_text("即时：%s\n" % record.get("immediate", ""))
 	body.append_text("后续：%s" % record.get("long_term", "无持续影响"))
@@ -247,3 +308,11 @@ func _get_severity_color(severity: String) -> Color:
 			return Color(1.0, 0.45, 0.42, 1.0)
 		_:
 			return Color(0.86, 0.82, 0.7, 1.0)
+
+
+func _get_judgement_color(score: int) -> Color:
+	if score >= 2:
+		return Color(0.58, 0.92, 0.62, 1.0)
+	if score <= -2:
+		return Color(1.0, 0.62, 0.44, 1.0)
+	return Color(0.72, 0.68, 0.56, 1.0)

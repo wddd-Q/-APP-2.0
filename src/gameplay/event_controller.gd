@@ -10,6 +10,7 @@ var event_chain_state: Dictionary = {}
 var event_records: Array[Dictionary] = []
 var active_impacts: Array[Dictionary] = []
 var months_since_event: int = 0
+var unread_event_count: int = 0
 
 const MONTHLY_EVENT_CHANCE := 0.35
 const PITY_EVENT_MONTHS := 4
@@ -29,6 +30,7 @@ func reset_state() -> void:
 	event_records.clear()
 	active_impacts.clear()
 	months_since_event = 0
+	unread_event_count = 0
 	EventBus.event_ledger_changed.emit()
 
 
@@ -62,11 +64,13 @@ func roll_events() -> Array[Dictionary]:
 
 	active_events = triggered
 	for triggered_event in triggered:
+		unread_event_count += 1
 		EventBus.random_event_triggered.emit(triggered_event["id"])
+	EventBus.event_ledger_changed.emit()
 	return triggered
 
 
-func resolve_choice(event_id: String, choice: int) -> Dictionary:
+func resolve_choice(event_id: String, choice: int, handler_id: String = "") -> Dictionary:
 	"""玩家做出选择后的结算"""
 	for event in active_events:
 		if event["id"] != event_id:
@@ -78,6 +82,8 @@ func resolve_choice(event_id: String, choice: int) -> Dictionary:
 
 		var selected = choices[choice]
 		var result = _apply_event_effects(selected.get("effects", {}))
+		result["handler"] = _get_handler_summary(handler_id)
+		result["handler_judgement"] = get_choice_judgement(event_id, choice, handler_id)
 
 		if selected.has("chain_tag"):
 			var tag = selected["chain_tag"]
@@ -85,6 +91,7 @@ func resolve_choice(event_id: String, choice: int) -> Dictionary:
 
 		if not result.get("blocked", false):
 			_record_resolved_event(event, selected, result)
+			_add_handler_memory(handler_id, event)
 
 		EventBus.event_choice_made.emit(event_id, choice)
 		if not result.get("blocked", false):
@@ -92,6 +99,179 @@ func resolve_choice(event_id: String, choice: int) -> Dictionary:
 		return result
 
 	return {"error": "事件不存在"}
+
+
+func mark_events_read() -> void:
+	if unread_event_count == 0:
+		return
+	unread_event_count = 0
+	EventBus.event_ledger_changed.emit()
+
+
+func get_event_handlers() -> Array[Dictionary]:
+	var handlers: Array[Dictionary] = [{
+		"id": "",
+		"name": "掌门亲自处理",
+		"position": "掌门",
+		"hint": "当前默认处理方式",
+	}]
+	var sect = GameManager.current_sect
+	if not sect:
+		return handlers
+
+	for disciple in sect.disciples:
+		if not disciple.alive:
+			continue
+		if disciple.position in ["副掌门", "副长老", "长老", "执事"]:
+			handlers.append({
+				"id": disciple.disciple_id,
+				"name": disciple.disciple_name,
+				"position": disciple.position,
+				"hint": "%s · %s" % [disciple.position, DataRegistry.get_realm_name(disciple.realm)],
+			})
+	return handlers
+
+
+func get_choice_judgement(event_id: String, choice_idx: int, handler_id: String = "") -> Dictionary:
+	if handler_id == "":
+		return {
+			"score": 0,
+			"label": "掌门定夺",
+			"reason": "由掌门亲自处理，不受弟子性格影响。",
+		}
+	for event in active_events:
+		if event.get("id", "") == event_id:
+			return _judge_choice_by_handler(event, choice_idx, handler_id)
+	return {"score": 0, "label": "无判断", "reason": "未找到待处理事件。"}
+
+
+func _judge_choice_by_handler(event: Dictionary, choice_idx: int, handler_id: String) -> Dictionary:
+	var disciple = _get_handler_disciple(handler_id)
+	if not disciple:
+		return {"score": 0, "label": "无判断", "reason": "未找到受命弟子。"}
+
+	var choices = event.get("choices", [])
+	if choice_idx < 0 or choice_idx >= choices.size():
+		return {"score": 0, "label": "无判断", "reason": "无效选项。"}
+
+	var choice = choices[choice_idx]
+	var action = choice.get("effects", {}).get("action", "")
+	var score = 0
+	var reasons: Array[String] = []
+	for personality in disciple.personalities:
+		var delta = _get_personality_choice_affinity(personality, action, choice)
+		score += delta
+		if delta > 0:
+			reasons.append("%s赞成此类处理" % personality)
+		elif delta < 0:
+			reasons.append("%s不喜此类处理" % personality)
+
+	if disciple.position in ["副掌门", "副长老", "长老"] and abs(score) > 0:
+		score += 1 if score > 0 else -1
+
+	return {
+		"score": score,
+		"label": _get_judgement_label(score),
+		"reason": _make_judgement_reason(disciple, reasons),
+	}
+
+
+func _get_personality_choice_affinity(personality: String, action: String, choice: Dictionary) -> int:
+	var spend = int(choice.get("effects", {}).get("spirit_stones", 0)) < 0
+	match personality:
+		"勇猛":
+			if action in ["combat_beast", "force_cultivation", "guard_caravan", "punish"]:
+				return 2
+			if action in ["evacuate", "safe_cultivation", "nothing"]:
+				return -1
+		"谨慎":
+			if action in ["evacuate", "safe_cultivation", "temper_foundation", "mediate", "nothing"]:
+				return 2
+			if action in ["force_cultivation", "invest_vein", "combat_beast"]:
+				return -2
+		"贪婪":
+			if action in ["open_trade", "invest_vein", "test_wanderer", "buy_foundation_materials"]:
+				return 1
+			if spend and action in ["reward_generation_oath", "steady_breakthrough", "mediate"]:
+				return -1
+		"忠诚":
+			if action in ["record_generation_oath", "reward_generation_oath", "guard_caravan", "steady_breakthrough", "mediate"]:
+				return 2
+			if action in ["ignore", "nothing"]:
+				return -1
+		"孤傲":
+			if action in ["punish", "self_decision", "test_wanderer", "force_cultivation"]:
+				return 1
+			if action in ["mediate", "recruit_wanderer"]:
+				return -1
+		"好奇":
+			if action in ["invest_vein", "test_wanderer", "open_trade", "buy_foundation_materials", "alchemy_lecture"]:
+				return 2
+			if action in ["nothing", "evacuate"]:
+				return -1
+		"善良":
+			if action in ["recruit_wanderer", "mediate", "guard_caravan", "steady_breakthrough", "reward_generation_oath"]:
+				return 2
+			if action in ["punish", "ignore", "evacuate"]:
+				return -1
+		"阴狠":
+			if action in ["punish", "test_wanderer", "force_cultivation", "self_decision"]:
+				return 2
+			if action in ["mediate", "reward_generation_oath"]:
+				return -1
+	return 0
+
+
+func _get_judgement_label(score: int) -> String:
+	if score >= 4:
+		return "强烈赞同"
+	if score >= 2:
+		return "倾向支持"
+	if score <= -4:
+		return "强烈反对"
+	if score <= -2:
+		return "不太赞成"
+	return "可接受"
+
+
+func _make_judgement_reason(disciple: Resource, reasons: Array[String]) -> String:
+	var base = "%s（%s）" % [disciple.disciple_name, "、".join(disciple.personalities)]
+	if reasons.is_empty():
+		return "%s认为此事可由掌门权衡。" % base
+	return "%s判断：%s。" % [base, "；".join(reasons.slice(0, 2))]
+
+
+func _get_handler_summary(handler_id: String) -> Dictionary:
+	if handler_id == "":
+		return {"id": "", "name": "掌门", "position": "掌门"}
+	var disciple = _get_handler_disciple(handler_id)
+	if not disciple:
+		return {"id": handler_id, "name": "未知弟子", "position": "未知"}
+	return {
+		"id": disciple.disciple_id,
+		"name": disciple.disciple_name,
+		"position": disciple.position,
+		"personalities": disciple.personalities.duplicate(),
+	}
+
+
+func _add_handler_memory(handler_id: String, event: Dictionary) -> void:
+	var disciple = _get_handler_disciple(handler_id)
+	if not disciple:
+		return
+	disciple.add_memory("宗门历%d年 受命处理宗门纪事「%s」。" % [TimeManager.year, event.get("name", "事件")])
+
+
+func _get_handler_disciple(handler_id: String):
+	var sect = GameManager.current_sect
+	if not sect or handler_id == "":
+		return null
+	if sect.has_method("get_disciple_by_id"):
+		return sect.get_disciple_by_id(handler_id)
+	for disciple in sect.disciples:
+		if disciple.disciple_id == handler_id:
+			return disciple
+	return null
 
 
 func _initialize_event_pool() -> void:
@@ -323,6 +503,8 @@ func _record_resolved_event(event: Dictionary, selected: Dictionary, result: Dic
 		"months_remaining": impact.get("months", 0),
 		"category": event.get("category", "经营事件"),
 		"is_story": event.get("is_story", false),
+		"handler": result.get("handler", {}),
+		"handler_judgement": result.get("handler_judgement", {}),
 	}
 	event_records.push_front(record)
 	if event_records.size() > MAX_EVENT_RECORDS:

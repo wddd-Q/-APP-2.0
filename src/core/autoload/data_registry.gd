@@ -442,6 +442,7 @@ func _load_world_lore() -> void:
 func _load_positions() -> void:
 	sect_positions = {
 		"副掌门": {"salary": 30, "min_realm": 3, "rank_unlock": 4, "max_count": 1, "bonus": "cultivation_boost", "bonus_value": 0.15, "description": "协助掌门管理宗门事务"},
+		"副长老": {"salary": 16, "min_realm": 2, "rank_unlock": 8, "max_count": 1, "bonus": "event_advice", "bonus_value": 0.10, "description": "协助处理宗门纪事，性格会影响其处置判断"},
 		"长老": {"salary": 20, "min_realm": 2, "rank_unlock": 8, "max_count": 2, "bonus": "teaching_boost", "bonus_value": 0.10, "description": "指导弟子修炼，传授功法"},
 		"护法": {"salary": 10, "min_realm": 1, "rank_unlock": 7, "max_count": 2, "bonus": "defense_boost", "bonus_value": 0.10, "description": "守护山门，抵御外敌"},
 		"执事": {"salary": 5, "min_realm": 1, "rank_unlock": 9, "max_count": 3, "bonus": "efficiency_boost", "bonus_value": 0.05, "description": "管理日常事务，协调资源分配"},

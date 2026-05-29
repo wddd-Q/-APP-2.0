@@ -12,7 +12,7 @@ var _result_label: Label
 
 
 func _ready() -> void:
-	EventBus.random_event_triggered.connect(_show_event)
+	# 事件不再自动弹出；统一在「宗门纪事」中阅读和处理。
 	visible = false
 
 	_result_label = Label.new()

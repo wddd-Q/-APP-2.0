@@ -11,6 +11,8 @@ extends Control
 @onready var main_tab_container: TabContainer = $"../MainView/TabContainer"
 @onready var advance_month_button: Button = $TopBar/AdvanceMonthButton
 
+var _event_ledger_badge: Label
+
 
 func _ready() -> void:
 	EventBus.month_passed.connect(_refresh_display)
@@ -19,6 +21,7 @@ func _ready() -> void:
 	EventBus.disciple_recruited.connect(_on_disciple_count_changed)
 	EventBus.disciple_died.connect(_on_disciple_count_changed)
 	EventBus.disciple_broken_through.connect(_on_disciple_breakthrough)
+	EventBus.event_ledger_changed.connect(_refresh_event_badge)
 	advance_month_button.pressed.connect(_on_advance_month)
 
 	# 存档按钮
@@ -77,6 +80,14 @@ func _ready() -> void:
 	$TopBar.add_child(ledger_btn)
 	$TopBar.move_child(ledger_btn, $TopBar.get_child_count() - 2)
 
+	_event_ledger_badge = Label.new()
+	_event_ledger_badge.text = "●"
+	_event_ledger_badge.visible = false
+	_event_ledger_badge.add_theme_font_size_override("font_size", 18)
+	_event_ledger_badge.add_theme_color_override("font_color", Color(1.0, 0.12, 0.08, 1.0))
+	$TopBar.add_child(_event_ledger_badge)
+	$TopBar.move_child(_event_ledger_badge, $TopBar.get_child_count() - 2)
+
 	# 修真史记按钮
 	var lore_btn = Button.new()
 	lore_btn.text = "修真史记"
@@ -86,6 +97,7 @@ func _ready() -> void:
 	$TopBar.move_child(lore_btn, $TopBar.get_child_count() - 2)
 
 	_refresh_display(TimeManager.month, TimeManager.year)
+	_refresh_event_badge()
 
 
 func _refresh_display(_month: int, _year: int) -> void:
@@ -143,6 +155,7 @@ func _on_warehouse_pressed() -> void:
 
 func _on_event_ledger_pressed() -> void:
 	get_parent().get_node("EventLedgerPanel").open_panel()
+	_refresh_event_badge()
 
 
 func _on_lore_pressed() -> void:
@@ -175,3 +188,9 @@ func _get_rank_name(rank: int) -> String:
 		4: "四品", 3: "三品", 2: "二品", 1: "一品", 0: "超品",
 	}
 	return names.get(rank, "未知")
+
+
+func _refresh_event_badge() -> void:
+	if not _event_ledger_badge:
+		return
+	_event_ledger_badge.visible = EventController.unread_event_count > 0
