@@ -139,6 +139,8 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 			"task": d.assigned_task,
 			"location": d.location,
 			"personalities": d.personalities,
+			"specialty": d.specialty,
+			"origin_story": d.origin_story,
 			"memories": d.life_memories,
 			"position": d.position,
 		}
@@ -231,6 +233,8 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 		d.assigned_task = dd.get("task", "")
 		d.location = dd.get("location", "sect")
 		d.personalities = dd.get("personalities", [])
+		d.specialty = dd.get("specialty", "")
+		d.origin_story = dd.get("origin_story", "")
 		d.life_memories = dd.get("memories", [])
 		d.position = dd.get("position", "普通弟子")
 		sect.add_disciple(d)

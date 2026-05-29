@@ -115,6 +115,21 @@ func _create_candidate_card(candidate: Dictionary, idx: int) -> Control:
 	hint.add_theme_font_size_override("font_size", 16)
 	card.add_child(hint)
 
+	var specialty = Label.new()
+	specialty.text = "擅长: %s  |  性格: %s" % [
+		candidate.get("specialty", "未明"),
+		", ".join(candidate.get("personalities", [])),
+	]
+	specialty.add_theme_font_size_override("font_size", 15)
+	card.add_child(specialty)
+
+	var story = Label.new()
+	story.text = candidate.get("origin_story", "来历未明")
+	story.autowrap_mode = TextServer.AUTOWRAP_WORD
+	story.add_theme_font_size_override("font_size", 14)
+	story.add_theme_color_override("font_color", Color(0.75, 0.7, 0.58, 1.0))
+	card.add_child(story)
+
 	var root_label = Label.new()
 	if candidate["root_revealed"]:
 		root_label.text = "灵根: " + candidate["root_name"]

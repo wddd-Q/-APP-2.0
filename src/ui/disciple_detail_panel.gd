@@ -17,6 +17,7 @@ var _attr_chart: StatRadarChart
 var _skill_chart: StatRadarChart
 var _breakthrough_label: RichTextLabel
 var _personalities_label: Label
+var _story_label: RichTextLabel
 var _relationships_list: VBoxContainer
 var _memories_list: VBoxContainer
 var _task_option: OptionButton
@@ -138,6 +139,15 @@ func _build_ui() -> void:
 	_personalities_label = Label.new()
 	content.add_child(_personalities_label)
 
+	# === 来历 ===
+	content.add_child(_make_section("来历"))
+	_story_label = RichTextLabel.new()
+	_story_label.bbcode_enabled = true
+	_story_label.fit_content = true
+	_story_label.scroll_active = false
+	_story_label.add_theme_font_size_override("normal_font_size", 15)
+	content.add_child(_story_label)
+
 	# === 关系 ===
 	content.add_child(_make_section("关系"))
 	_relationships_list = VBoxContainer.new()
@@ -251,6 +261,7 @@ func _refresh_all() -> void:
 	)
 
 	_personalities_label.text = "人格: " + (", ".join(_current_disciple.personalities) if _current_disciple.personalities else "无明显特征")
+	_refresh_story()
 
 	_refresh_breakthrough_info()
 	_refresh_relationships()
@@ -277,6 +288,14 @@ func _refresh_grid(grid: GridContainer, data: Array) -> void:
 		elif pair[1] < 30:
 			val_lbl.add_theme_color_override("font_color", Color.RED)
 		grid.add_child(val_lbl)
+
+
+func _refresh_story() -> void:
+	_story_label.clear()
+	var specialty = _current_disciple.specialty if _current_disciple.specialty != "" else "暂无明确擅长"
+	_story_label.append_text("擅长: [color=#d9c85f]%s[/color]\n" % specialty)
+	var story = _current_disciple.origin_story if _current_disciple.origin_story != "" else "此弟子来历尚未整理。"
+	_story_label.append_text(story)
 
 
 func _refresh_relationships() -> void:
@@ -458,16 +477,16 @@ func _refresh_position_selector() -> void:
 	var idx = 0
 	for pos_name in DataRegistry.sect_positions:
 		var pos_data = DataRegistry.sect_positions[pos_name]
-		if sect.rank > pos_data.get("rank_unlock", 9):
-			continue
-		if _current_disciple.realm < pos_data.get("min_realm", 0) and pos_name != "普通弟子":
-			continue
 
 		var cur_count = SectController.get_position_count(pos_name)
 		var max_count = SectController.get_position_max(pos_name)
+		var state = SectController.can_assign_position(_current_disciple, pos_name)
 		var label = "%s (%d/%d) %d灵石/月" % [pos_name, cur_count, max_count, pos_data.get("salary", 0)]
+		if not state.get("ok", false):
+			label += " - " + state.get("reason", "")
 		_position_option.add_item(label)
 		_position_option.set_item_metadata(_position_option.item_count - 1, pos_name)
+		_position_option.set_item_disabled(_position_option.item_count - 1, not state.get("ok", false))
 		if pos_name == current_pos:
 			_position_option.select(_position_option.item_count - 1)
 

@@ -85,6 +85,8 @@ func assign_position(disciple: Resource, position_name: String) -> bool:
 	var pos_data = DataRegistry.sect_positions.get(position_name, {})
 	if pos_data.is_empty():
 		return false
+	if disciple.position == position_name:
+		return true
 
 	# 检查硬限制
 	if disciple.realm < pos_data.get("min_realm", 0):
@@ -103,6 +105,24 @@ func assign_position(disciple: Resource, position_name: String) -> bool:
 	disciple.add_memory("宗门历%d年 被任命为%s。" % [TimeManager.year, position_name])
 	EventBus.position_changed.emit(disciple.disciple_id, old_pos, position_name)
 	return true
+
+
+func can_assign_position(disciple: Resource, position_name: String) -> Dictionary:
+	var sect = GameManager.current_sect
+	if not sect or not disciple:
+		return {"ok": false, "reason": "宗门或弟子不存在"}
+	var pos_data = DataRegistry.sect_positions.get(position_name, {})
+	if pos_data.is_empty():
+		return {"ok": false, "reason": "职位不存在"}
+	if disciple.position == position_name:
+		return {"ok": true, "reason": "当前职位"}
+	if disciple.realm < pos_data.get("min_realm", 0):
+		return {"ok": false, "reason": "境界不足，需要%s" % DataRegistry.get_realm_name(pos_data.get("min_realm", 1))}
+	if sect.rank > pos_data.get("rank_unlock", 9):
+		return {"ok": false, "reason": "宗门品级不足，需要%d品" % pos_data.get("rank_unlock", 9)}
+	if not _has_position_slot(position_name):
+		return {"ok": false, "reason": "职位名额已满"}
+	return {"ok": true, "reason": "可任命"}
 
 
 func demote_to_default(disciple: Resource) -> void:

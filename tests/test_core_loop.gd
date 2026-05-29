@@ -21,6 +21,8 @@ func run_all_tests() -> void:
 	test_breakthrough_attempt()
 	test_resource_generation()
 	test_monthly_maintenance()
+	test_recruitment_profiles()
+	test_event_ledger_panel_build()
 	test_multiple_months_simulation()
 	test_event_triggering()
 
@@ -114,6 +116,53 @@ func test_monthly_maintenance() -> void:
 
 	assert_that(sect.spirit_stones >= 0, "一年后灵石不应为负（产出≈维护）")
 	print("  一年后灵石: %d" % sect.spirit_stones)
+
+
+func test_recruitment_profiles() -> void:
+	print("\n=== 测试: 招募弟子画像 ===")
+	GameSetup.setup_new_game("招募测试宗")
+	var sect = GameManager.current_sect
+	sect.spirit_stones = 2000
+
+	var candidates = RecruitmentController.generate_candidates(3)
+	assert_that(candidates.size() == 3, "应生成3名候选弟子")
+	var candidate = candidates[0]
+	var attrs = [
+		candidate["bone_structure"],
+		candidate["comprehension"],
+		candidate["fortune"],
+		candidate["mentality"],
+		candidate["charm"],
+		candidate["talent"],
+	]
+	var has_variation = false
+	for value in attrs:
+		if value != 50:
+			has_variation = true
+			break
+	assert_that(has_variation, "候选弟子属性不应全为50")
+	assert_that(candidate.get("specialty", "") != "", "候选弟子应有擅长方向")
+	assert_that(candidate.get("origin_story", "") != "", "候选弟子应有来历故事")
+
+	var disciple = RecruitmentController.recruit(candidate)
+	assert_that(disciple != null, "应能招收候选弟子")
+	assert_that(disciple.specialty != "", "入门弟子应保留擅长方向")
+	assert_that(disciple.origin_story != "", "入门弟子应保留来历故事")
+
+
+func test_event_ledger_panel_build() -> void:
+	print("\n=== 测试: 宗门纪事面板 ===")
+	GameSetup.setup_new_game("纪事测试宗")
+	var event = EventController.event_pool[0].duplicate(true)
+	EventController.active_events = [event]
+	EventController.unread_event_count = 1
+
+	var panel = preload("res://src/ui/event_ledger_panel.gd").new()
+	add_child(panel)
+	panel.open_panel()
+	assert_that(panel.visible, "宗门纪事面板应能打开")
+	assert_that(EventController.unread_event_count == 0, "打开纪事后应清除未读红点")
+	panel.queue_free()
 
 
 func test_multiple_months_simulation() -> void:

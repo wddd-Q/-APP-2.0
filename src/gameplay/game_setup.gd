@@ -65,6 +65,32 @@ static func _create_starter_disciple(sect: Resource, dname: String, gender: int,
 	d.assigned_task = "cultivating"
 	d.lifespan = 120
 	d.personalities = personalities
+	d.specialty = _starter_specialty(dname)
+	d.origin_story = _starter_story(dname)
 
 	sect.add_disciple(d)
 	d.add_memory("宗门历%d年 %s入门，成为本门初代弟子。" % [TimeManager.year, d.disciple_name])
+
+
+static func _starter_specialty(dname: String) -> String:
+	match dname:
+		"大弟子":
+			return "护山与剑修"
+		"二弟子":
+			return "阵法与探秘"
+		"小师妹":
+			return "灵植与医术"
+		_:
+			return "宗门杂务"
+
+
+static func _starter_story(dname: String) -> String:
+	match dname:
+		"大弟子":
+			return "山门破败时最早留下的弟子，曾独自守过一夜妖兽袭山，因此行事偏向勇猛直接。"
+		"二弟子":
+			return "幼年在旧书摊翻到残缺阵图，对失传阵纹格外敏感，常怀疑本门山门另有旧秘。"
+		"小师妹":
+			return "由山下药户送入宗门，自小识得草木药性，待人温和，却也比旁人更能察觉伤病与心绪。"
+		_:
+			return "随掌门重整山门的初代弟子。"

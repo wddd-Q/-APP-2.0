@@ -36,7 +36,7 @@ func _build_ui() -> void:
 	add_child(bg)
 
 	var panel = Panel.new()
-	panel.size = Vector2(940, 660)
+	panel.size = Vector2(1120, 700)
 	panel.position = Vector2(get_viewport().get_visible_rect().size / 2 - panel.size / 2)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(panel)
@@ -80,9 +80,9 @@ func _build_ui() -> void:
 	columns.add_theme_constant_override("separation", 14)
 	root.add_child(columns)
 
-	_pending_list = _make_column(columns, "待处理", Vector2(250, 0))
-	_impact_list = _make_column(columns, "影响中", Vector2(300, 0))
-	_history_list = _make_column(columns, "归档", Vector2(330, 0))
+	_pending_list = _make_column(columns, "待处理", Vector2(500, 0))
+	_impact_list = _make_column(columns, "影响中", Vector2(260, 0))
+	_history_list = _make_column(columns, "归档", Vector2(300, 0))
 
 	_empty_label = Label.new()
 	_empty_label.text = "暂无纪事"
@@ -188,6 +188,8 @@ func _make_pending_card(event: Dictionary) -> Control:
 	for handler in handlers:
 		handler_selector.add_item("%s  %s" % [handler.get("name", ""), handler.get("hint", "")])
 		handler_selector.set_item_metadata(handler_selector.item_count - 1, handler.get("id", ""))
+	if handler_selector.item_count > 0:
+		handler_selector.select(0)
 	card.add_child(handler_selector)
 
 	var choices_box = VBoxContainer.new()
@@ -199,7 +201,8 @@ func _make_pending_card(event: Dictionary) -> Control:
 			child.queue_free()
 		var handler_id = ""
 		if handler_selector.item_count > 0:
-			handler_id = str(handler_selector.get_item_metadata(handler_selector.selected))
+			var selected_idx = maxi(0, handler_selector.selected)
+			handler_id = str(handler_selector.get_item_metadata(selected_idx))
 		var choices = event.get("choices", [])
 		for i in range(choices.size()):
 			var choice = choices[i]
