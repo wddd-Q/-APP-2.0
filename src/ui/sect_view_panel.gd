@@ -69,6 +69,7 @@ var _map_texture: Texture2D
 var _selected_facility_type: String = ""
 var _panel: Panel
 var _anim_time: float = 0.0
+var _map_clicks: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -331,11 +332,13 @@ func _on_draw(canvas: Control) -> void:
 		canvas.draw_circle(center, 50, Color(0.3, 0.7, 1.0, glow_alpha * 2))
 
 	_draw_disciple_markers(canvas, sect, center, wall_radius, layout_scale)
+	_draw_map_clicks(canvas)
 	_draw_legend(canvas)
 
 
 func _on_canvas_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+		_add_map_click(ev.position)
 		_selected_facility_type = _find_facility_at(ev.position)
 		_refresh()
 
@@ -503,6 +506,32 @@ func _draw_disciple_activity_effect(canvas: Control, pos: Vector2, disciple: Res
 		"", "idle":
 			canvas.draw_circle(pos + Vector2(8, -8 - phase * 2.0), 3.0, Color(0.9, 0.9, 0.75, 0.25))
 			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9 - phase * 3.0), "休", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.88, 0.84, 0.64, 0.95))
+
+
+func _add_map_click(position: Vector2) -> void:
+	_map_clicks.append({
+		"position": position,
+		"time": _anim_time,
+	})
+	while _map_clicks.size() > 10:
+		_map_clicks.pop_front()
+
+
+func _draw_map_clicks(canvas: Control) -> void:
+	var alive: Array[Dictionary] = []
+	for click in _map_clicks:
+		var age = _anim_time - float(click.get("time", _anim_time))
+		var t = clampf(age / 0.55, 0.0, 1.0)
+		if t >= 1.0:
+			continue
+		alive.append(click)
+		var pos: Vector2 = click.get("position", Vector2.ZERO)
+		var alpha = 1.0 - t
+		var radius = lerpf(10.0, 58.0, t)
+		canvas.draw_circle(pos, radius * 0.28, Color(0.95, 0.82, 0.32, 0.12 * alpha))
+		canvas.draw_arc(pos, radius, 0.0, TAU, 52, Color(0.95, 0.82, 0.32, 0.58 * alpha), 2.0, true)
+		canvas.draw_arc(pos, radius * 0.62, 0.0, TAU, 52, Color(0.45, 0.82, 0.96, 0.36 * alpha), 1.2, true)
+	_map_clicks = alive
 
 
 func _get_disciple_activity_bob(disciple: Resource, index: int) -> Vector2:

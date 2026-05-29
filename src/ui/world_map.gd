@@ -10,6 +10,7 @@ var _detail_info: RichTextLabel
 var _world_log: RichTextLabel
 var _selected_region: String = ""
 var _marker_nodes: Array[Control] = []
+var _marker_motion: Array[Dictionary] = []
 var _animation_layer: Control
 var _anim_time: float = 0.0
 
@@ -111,6 +112,7 @@ func _refresh() -> void:
 		if is_instance_valid(marker):
 			marker.queue_free()
 	_marker_nodes.clear()
+	_marker_motion.clear()
 
 	_add_region_markers()
 	_add_incident_markers()
@@ -124,8 +126,10 @@ func _refresh() -> void:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
-	if visible and _animation_layer:
-		_animation_layer.queue_redraw()
+	if visible:
+		_animate_marker_motion()
+		if _animation_layer:
+			_animation_layer.queue_redraw()
 
 
 func _add_region_markers() -> void:
@@ -166,6 +170,30 @@ func _place_marker(marker: Button, grid_x: int, grid_y: int, offset: Vector2) ->
 		(float(grid_y) + 0.5) / 5.0 * map_size.y
 	)
 	marker.position = pos - marker.custom_minimum_size * 0.5 + offset
+	marker.pivot_offset = marker.custom_minimum_size * 0.5
+	_marker_motion.append({
+		"marker": marker,
+		"base_position": marker.position,
+		"phase": float(abs(hash(marker.tooltip_text)) % 1000) / 117.0,
+		"alert": offset.length() > 0.0,
+	})
+
+
+func _animate_marker_motion() -> void:
+	for data in _marker_motion:
+		var marker = data.get("marker")
+		if not is_instance_valid(marker):
+			continue
+		var base_position: Vector2 = data.get("base_position", marker.position)
+		var phase: float = data.get("phase", 0.0)
+		var alert: bool = data.get("alert", false)
+		var speed = 3.2 if alert else 1.8
+		var height = 3.0 if alert else 1.5
+		var strength = 0.07 if alert else 0.035
+		var wave = sin(_anim_time * speed + phase)
+		var scale_value = 1.0 + strength * (0.5 + 0.5 * wave)
+		marker.position = base_position + Vector2(0.0, wave * height)
+		marker.scale = Vector2.ONE * scale_value
 
 
 func _draw_dynamic_world() -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://dmainscene001"]
+[gd_scene load_steps=18 format=3 uid="uid://dmainscene001"]
 
 [ext_resource type="Script" path="res://src/ui/game_hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://src/ui/sect_overview.gd" id="2_overview"]
@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://src/ui/sect_view_panel.gd" id="13_sectview"]
 [ext_resource type="Script" path="res://src/ui/event_ledger_panel.gd" id="14_eventledger"]
 [ext_resource type="Script" path="res://src/ui/disciple_roster_panel.gd" id="15_roster"]
+[ext_resource type="Script" path="res://src/ui/input_feedback_layer.gd" id="16_feedback"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -311,3 +312,11 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 1
 script = ExtResource("14_eventledger")
+
+[node name="InputFeedbackLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("16_feedback")
