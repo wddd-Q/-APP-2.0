@@ -68,11 +68,13 @@ var _canvas: Control
 var _map_texture: Texture2D
 var _selected_facility_type: String = ""
 var _panel: Panel
+var _anim_time: float = 0.0
 
 
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	set_process(true)
 	_build_ui()
 	EventBus.month_passed.connect(_on_data_changed)
 	EventBus.facility_built.connect(_on_data_changed)
@@ -164,6 +166,12 @@ func _notification(what: int) -> void:
 		_refresh()
 
 
+func _process(delta: float) -> void:
+	_anim_time += delta
+	if visible and _canvas:
+		_canvas.queue_redraw()
+
+
 func _layout_panel() -> void:
 	var vp = get_viewport().get_visible_rect().size
 	var width = minf(1080.0, maxf(720.0, vp.x - 64.0))
@@ -206,7 +214,8 @@ func _update_info() -> void:
 	for f in sect.facilities:
 		var tmpl = DataRegistry.facility_templates.get(f.facility_type, {})
 		var count = _get_disciples_at_anchor(sect, f.facility_type).size()
-		_info_label.append_text("  %s Lv.%d  弟子%d\n" % [tmpl.get("name", "?"), f.level, count])
+		var state = " 修建%d%%" % f.build_progress if f.is_building else ""
+		_info_label.append_text("  %s Lv.%d%s  弟子%d\n" % [tmpl.get("name", "?"), f.level, state, count])
 	_info_label.append_text("\n设施数: %d/%d" % [sect.facilities.size(), sect.max_facilities()])
 	_info_label.append_text("\n弟子数: %d/%d" % [sect.disciples.size(), sect.max_disciples()])
 
@@ -227,7 +236,9 @@ func _on_draw(canvas: Control) -> void:
 		canvas.draw_rect(Rect2(Vector2.ZERO, canvas.size), Color(0.15, 0.25, 0.12, 1.0))
 
 	# 宗门中心地基
+	var breath = 0.5 + 0.5 * sin(_anim_time * 1.6)
 	canvas.draw_circle(center, 40, Color(0.3, 0.3, 0.3, 0.7))
+	canvas.draw_circle(center, 56 + breath * 8.0, Color(0.45, 0.65, 0.95, 0.08 + breath * 0.04), false, 1.5)
 
 	# 主殿（宗门中心）
 	var main_bldg = Rect2(center - Vector2(22, 18), Vector2(44, 36))
@@ -274,6 +285,9 @@ func _on_draw(canvas: Control) -> void:
 		if f.facility_type == _selected_facility_type:
 			canvas.draw_circle(bldg_pos, size + 9, Color(1.0, 0.85, 0.25, 0.35), false, 3.0)
 
+		if f.is_building:
+			_draw_construction_effect(canvas, bldg_pos, size, f)
+
 		# 等级星标
 		var stars = ""
 		for _i in range(f.level): stars += "★"
@@ -286,9 +300,10 @@ func _on_draw(canvas: Control) -> void:
 
 		# 建筑名
 		var name = tmpl.get("name", "?")
+		var build_label = " 修" if f.is_building else ""
 		canvas.draw_string(ThemeDB.fallback_font,
 			bldg_pos + Vector2(-16, -size - 14),
-			"%s Lv.%d" % [name, f.level],
+			"%s Lv.%d%s" % [name, f.level, build_label],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 			Color.WHITE
 		)
@@ -355,6 +370,8 @@ func _add_selected_facility_info(sect: Resource) -> void:
 	var maintenance = tmpl.get("maintenance", {}).get(facility.level, 0)
 	if maintenance > 0:
 		_info_label.append_text("维护: %d灵石/月\n" % maintenance)
+	if facility.is_building:
+		_info_label.append_text("状态: 修建/翻修中 %d%%\n" % facility.build_progress)
 	_add_next_upgrade_info(tmpl, facility)
 	_add_anchor_disciple_info(sect, _selected_facility_type)
 	_info_label.append_text("\n")
@@ -424,6 +441,20 @@ func _format_effect_value(effect_key: String, value) -> String:
 	return "%s %s" % [label, str(value)]
 
 
+func _draw_construction_effect(canvas: Control, pos: Vector2, size: float, facility: Resource) -> void:
+	var pulse = 0.5 + 0.5 * sin(_anim_time * 4.0)
+	var rect = Rect2(pos - Vector2(size + 5, size + 5), Vector2((size + 5) * 2.0, (size + 5) * 2.0))
+	canvas.draw_rect(rect, Color(0.95, 0.72, 0.22, 0.16 + pulse * 0.12), false, 2.0)
+	canvas.draw_line(rect.position, rect.position + rect.size, Color(0.95, 0.74, 0.28, 0.65), 1.5)
+	canvas.draw_line(rect.position + Vector2(rect.size.x, 0), rect.position + Vector2(0, rect.size.y), Color(0.95, 0.74, 0.28, 0.65), 1.5)
+	var bar_w = rect.size.x
+	var pct = clampf(float(facility.build_progress) / 100.0, 0.0, 1.0)
+	var bar = Rect2(pos + Vector2(-bar_w / 2.0, size + 16), Vector2(bar_w, 4))
+	canvas.draw_rect(bar, Color(0.05, 0.04, 0.02, 0.65))
+	canvas.draw_rect(Rect2(bar.position, Vector2(bar.size.x * pct, bar.size.y)), Color(0.95, 0.78, 0.28, 0.9))
+	canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(size + 8, 4), "建", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1.0, 0.86, 0.42, 1.0))
+
+
 func _draw_disciple_markers(canvas: Control, sect: Resource, center: Vector2, wall_radius: float, layout_scale: float) -> void:
 	var groups = _get_disciple_anchor_groups(sect)
 	for anchor in groups:
@@ -434,11 +465,13 @@ func _draw_disciple_markers(canvas: Control, sect: Resource, center: Vector2, wa
 			var d = disciples[i]
 			var angle = TAU * float(i) / float(maxi(1, max_visible))
 			var offset_radius = 22.0 if max_visible > 1 else 0.0
-			var marker_pos = anchor_pos + Vector2(cos(angle), sin(angle)) * offset_radius
+			var bob = _get_disciple_activity_bob(d, i)
+			var marker_pos = anchor_pos + Vector2(cos(angle), sin(angle)) * offset_radius + bob
 			var color = _get_disciple_marker_color(d)
 			canvas.draw_circle(marker_pos + Vector2(1, 1), 7.0, Color(0, 0, 0, 0.55))
 			canvas.draw_circle(marker_pos, 6.5, color)
 			canvas.draw_circle(marker_pos, 6.5, Color(0.08, 0.06, 0.03, 0.9), false, 1.2)
+			_draw_disciple_activity_effect(canvas, marker_pos, d)
 			canvas.draw_string(ThemeDB.fallback_font,
 				marker_pos + Vector2(-4, 4), d.disciple_name.left(1),
 				HORIZONTAL_ALIGNMENT_CENTER, 10, 10, Color(0.08, 0.06, 0.03, 1.0)
@@ -448,6 +481,45 @@ func _draw_disciple_markers(canvas: Control, sect: Resource, center: Vector2, wa
 				anchor_pos + Vector2(16, 18), "+%d" % (disciples.size() - max_visible),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1.0, 0.93, 0.68, 1.0)
 			)
+
+
+func _draw_disciple_activity_effect(canvas: Control, pos: Vector2, disciple: Resource) -> void:
+	var phase = 0.5 + 0.5 * sin(_anim_time * 3.0 + float(abs(hash(disciple.disciple_id)) % 10))
+	match disciple.assigned_task:
+		"cultivating":
+			canvas.draw_circle(pos, 11.0 + phase * 5.0, Color(0.45, 0.75, 1.0, 0.18), false, 1.4)
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9 - phase * 4.0), "修", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.72, 0.9, 1.0, 0.9))
+		"alchemy", "crafting":
+			canvas.draw_circle(pos + Vector2(8, -8), 2.0 + phase * 2.0, Color(1.0, 0.55, 0.22, 0.85))
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9), "丹" if disciple.assigned_task == "alchemy" else "器", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(1.0, 0.82, 0.45, 0.95))
+		"guarding":
+			canvas.draw_line(pos + Vector2(-10, -10), pos + Vector2(10, -10), Color(0.95, 0.78, 0.32, 0.8), 1.2)
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9), "守", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.95, 0.82, 0.42, 0.95))
+		"herb_gathering":
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9 - phase * 3.0), "采", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.55, 0.95, 0.58, 0.95))
+		"exploring", "market_work", "guard_caravan", "beast_hunting", "teach_wanderers":
+			canvas.draw_line(pos + Vector2(-9, 8), pos + Vector2(9, 8), Color(0.7, 0.85, 1.0, 0.55 + phase * 0.3), 1.4)
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9), "行", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.78, 0.88, 1.0, 0.95))
+		"", "idle":
+			canvas.draw_circle(pos + Vector2(8, -8 - phase * 2.0), 3.0, Color(0.9, 0.9, 0.75, 0.25))
+			canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(7, -9 - phase * 3.0), "休", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.88, 0.84, 0.64, 0.95))
+
+
+func _get_disciple_activity_bob(disciple: Resource, index: int) -> Vector2:
+	var seed = float(abs(hash(disciple.disciple_id)) % 100) / 100.0
+	var amount = 0.0
+	match disciple.assigned_task:
+		"cultivating":
+			amount = 1.5
+		"alchemy", "crafting", "herb_gathering":
+			amount = 2.2
+		"guarding":
+			amount = 1.0
+		"exploring", "market_work", "guard_caravan", "beast_hunting", "teach_wanderers":
+			amount = 3.0
+		"", "idle":
+			amount = 1.2
+	return Vector2(sin(_anim_time * 2.0 + seed * TAU + index), cos(_anim_time * 1.6 + seed * TAU)) * amount
 
 
 func _draw_legend(canvas: Control) -> void:

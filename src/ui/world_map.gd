@@ -10,12 +10,16 @@ var _detail_info: RichTextLabel
 var _world_log: RichTextLabel
 var _selected_region: String = ""
 var _marker_nodes: Array[Control] = []
+var _animation_layer: Control
+var _anim_time: float = 0.0
 
 
 func _ready() -> void:
 	_build_ui()
+	set_process(true)
 	EventBus.year_passed.connect(_on_year_passed)
 	EventBus.game_started.connect(_refresh)
+	EventBus.event_ledger_changed.connect(_refresh)
 	call_deferred("_refresh")
 
 
@@ -57,6 +61,12 @@ func _build_ui() -> void:
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_map_canvas.add_child(shade)
+
+	_animation_layer = Control.new()
+	_animation_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_animation_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_animation_layer.draw.connect(_draw_dynamic_world)
+	_map_canvas.add_child(_animation_layer)
 
 	var detail_panel = VBoxContainer.new()
 	detail_panel.custom_minimum_size = Vector2(340, 0)
@@ -108,6 +118,14 @@ func _refresh() -> void:
 		_show_world_summary()
 	else:
 		_refresh_detail(_selected_region)
+	if _animation_layer:
+		_animation_layer.queue_redraw()
+
+
+func _process(delta: float) -> void:
+	_anim_time += delta
+	if visible and _animation_layer:
+		_animation_layer.queue_redraw()
 
 
 func _add_region_markers() -> void:
@@ -148,6 +166,43 @@ func _place_marker(marker: Button, grid_x: int, grid_y: int, offset: Vector2) ->
 		(float(grid_y) + 0.5) / 5.0 * map_size.y
 	)
 	marker.position = pos - marker.custom_minimum_size * 0.5 + offset
+
+
+func _draw_dynamic_world() -> void:
+	if not _animation_layer:
+		return
+	var size = _animation_layer.size
+	var pulse = 0.5 + 0.5 * sin(_anim_time * 2.2)
+
+	# 灵气流向与局势线，让地图像一张正在被掌门观测的局势盘。
+	var home = _grid_to_canvas_pos(2, 2, size)
+	var sealing = _grid_to_canvas_pos(2, 4, size)
+	var central = _grid_to_canvas_pos(2, 1, size)
+	_animation_layer.draw_line(home, central, Color(0.35, 0.65, 0.9, 0.22 + pulse * 0.12), 2.0)
+	_animation_layer.draw_line(sealing, home, Color(0.62, 0.12, 0.2, 0.18 + pulse * 0.18), 2.0)
+
+	for incident in WorldController.get_world_incidents():
+		var region = DataRegistry.map_regions.get(incident.get("region_id", ""), {})
+		if region.is_empty():
+			continue
+		var pos = _grid_to_canvas_pos(region.get("grid_x", 0), region.get("grid_y", 0), size) + Vector2(18, -16)
+		var color = _get_incident_color(incident.get("severity", "low"))
+		var radius = 18.0 + pulse * 12.0
+		_animation_layer.draw_circle(pos, radius, Color(color.r, color.g, color.b, 0.12 + pulse * 0.10))
+		_animation_layer.draw_circle(pos, radius + 8.0, Color(color.r, color.g, color.b, 0.10), false, 2.0)
+
+	if _selected_region != "":
+		var selected = DataRegistry.map_regions.get(_selected_region, {})
+		if not selected.is_empty():
+			var selected_pos = _grid_to_canvas_pos(selected.get("grid_x", 0), selected.get("grid_y", 0), size)
+			_animation_layer.draw_circle(selected_pos, 30.0 + pulse * 5.0, Color(0.95, 0.82, 0.32, 0.2), false, 3.0)
+
+
+func _grid_to_canvas_pos(grid_x: int, grid_y: int, map_size: Vector2) -> Vector2:
+	return Vector2(
+		(float(grid_x) + 0.5) / 6.0 * map_size.x,
+		(float(grid_y) + 0.5) / 5.0 * map_size.y
+	)
 
 
 func _make_marker(text: String, color: Color) -> Button:

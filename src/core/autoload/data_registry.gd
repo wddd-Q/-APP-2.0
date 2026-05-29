@@ -441,6 +441,16 @@ func _load_world_lore() -> void:
 			"content": "招徒、修缮、任职、纪事四件事落定之后，宗门终于像一座真正运转起来的山门。也正是在整理旧库房时，弟子们发现数枚残缺阵钉。阵钉纹路与封魔洞附近出土的旧阵纹相似，说明本门山门或许曾是苍梧旧约封印体系的一角。",
 			"unlock_condition": "onboarding:old_array",
 		},
+		"story_05": {
+			"category": "暗线线索", "title": "后山魔痕", "era_tag": 4,
+			"content": "后山符灰并非寻常邪祟遗留，其纹路与封魔洞旧阵坐标存在微妙重合。若本门山门真是苍梧旧约封印体系的一角，那么魔修试探这里便不是偶然。",
+			"unlock_condition": "world_incident:demon_infiltration_home",
+		},
+		"story_06": {
+			"category": "暗线线索", "title": "暗格残页", "era_tag": 4,
+			"content": "暗格残页上记录的不是功法，而是封魔旧阵的几处偏位坐标。残页所用魔墨新旧混杂，说明有人在近年重新描摹过这份图，且很可能知道本门山门与旧阵之间的关联。",
+			"unlock_condition": "world_incident:demon_cache_uncovered",
+		},
 	}
 
 

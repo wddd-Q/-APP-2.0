@@ -94,6 +94,7 @@ func resolve_choice(event_id: String, choice: int, handler_id: String = "") -> D
 			_apply_handler_influence(handler_id, event, selected, result)
 			_record_resolved_event(event, selected, result)
 			_add_handler_memory(handler_id, event, selected, result)
+			WorldController.refresh_world_incidents()
 
 		EventBus.event_choice_made.emit(event_id, choice)
 		if not result.get("blocked", false):
@@ -198,44 +199,44 @@ func _get_personality_choice_affinity(personality: String, action: String, choic
 	var spend = int(choice.get("effects", {}).get("spirit_stones", 0)) < 0
 	match personality:
 		"勇猛":
-			if action in ["combat_beast", "force_cultivation", "guard_caravan", "punish"]:
+			if action in ["combat_beast", "force_cultivation", "guard_caravan", "punish", "purge_demon_trace", "uncover_demon_cache"]:
 				return 2
-			if action in ["evacuate", "safe_cultivation", "nothing"]:
+			if action in ["evacuate", "safe_cultivation", "nothing", "record_demon_trace"]:
 				return -1
 		"谨慎":
-			if action in ["evacuate", "safe_cultivation", "temper_foundation", "mediate", "nothing"]:
+			if action in ["evacuate", "safe_cultivation", "temper_foundation", "mediate", "nothing", "investigate_demon_trace", "observe_demon_whisper"]:
 				return 2
-			if action in ["force_cultivation", "invest_vein", "combat_beast"]:
+			if action in ["force_cultivation", "invest_vein", "combat_beast", "purge_demon_trace"]:
 				return -2
 		"贪婪":
-			if action in ["open_trade", "invest_vein", "test_wanderer", "buy_foundation_materials"]:
+			if action in ["open_trade", "invest_vein", "test_wanderer", "buy_foundation_materials", "uncover_demon_cache"]:
 				return 1
-			if spend and action in ["reward_generation_oath", "steady_breakthrough", "mediate"]:
+			if spend and action in ["reward_generation_oath", "steady_breakthrough", "mediate", "calm_demon_whisper"]:
 				return -1
 		"忠诚":
-			if action in ["record_generation_oath", "reward_generation_oath", "guard_caravan", "steady_breakthrough", "mediate"]:
+			if action in ["record_generation_oath", "reward_generation_oath", "guard_caravan", "steady_breakthrough", "mediate", "purge_demon_trace", "observe_demon_whisper"]:
 				return 2
 			if action in ["ignore", "nothing"]:
 				return -1
 		"孤傲":
-			if action in ["punish", "self_decision", "test_wanderer", "force_cultivation"]:
+			if action in ["punish", "self_decision", "test_wanderer", "force_cultivation", "inspect_demon_whisper"]:
 				return 1
-			if action in ["mediate", "recruit_wanderer"]:
+			if action in ["mediate", "recruit_wanderer", "calm_demon_whisper"]:
 				return -1
 		"好奇":
-			if action in ["invest_vein", "test_wanderer", "open_trade", "buy_foundation_materials", "alchemy_lecture"]:
+			if action in ["invest_vein", "test_wanderer", "open_trade", "buy_foundation_materials", "alchemy_lecture", "investigate_demon_trace", "uncover_demon_cache"]:
 				return 2
 			if action in ["nothing", "evacuate"]:
 				return -1
 		"善良":
-			if action in ["recruit_wanderer", "mediate", "guard_caravan", "steady_breakthrough", "reward_generation_oath"]:
+			if action in ["recruit_wanderer", "mediate", "guard_caravan", "steady_breakthrough", "reward_generation_oath", "calm_demon_whisper"]:
 				return 2
-			if action in ["punish", "ignore", "evacuate"]:
+			if action in ["punish", "ignore", "evacuate", "inspect_demon_whisper", "purge_demon_trace"]:
 				return -1
 		"阴狠":
-			if action in ["punish", "test_wanderer", "force_cultivation", "self_decision"]:
+			if action in ["punish", "test_wanderer", "force_cultivation", "self_decision", "inspect_demon_whisper", "purge_demon_trace"]:
 				return 2
-			if action in ["mediate", "reward_generation_oath"]:
+			if action in ["mediate", "reward_generation_oath", "calm_demon_whisper"]:
 				return -1
 	return 0
 
@@ -440,6 +441,48 @@ func _initialize_event_pool() -> void:
 				{"label": "赐下灵石嘉奖", "effects": {"action": "reward_generation_oath", "spirit_stones": -90}},
 			],
 		},
+		{
+			"id": "demon_trace_outer_path",
+			"name": "山外魔痕",
+			"description": "巡山弟子在后山小径发现一截焦黑符灰，符灰上残留的气息与寻常妖邪不同，像是被人刻意抹去过。",
+			"scope": "sect",
+			"rarity": "uncommon",
+			"cooldown": 10,
+			"conditions": {"chain_missing": "demon_trace_found", "max_year": 8},
+			"choices": [
+				{"label": "派谨慎弟子暗查", "effects": {"action": "investigate_demon_trace", "spirit_stones": -30}, "chain_tag": "demon_trace_found"},
+				{"label": "公开戒严，震慑暗处之人", "effects": {"action": "purge_demon_trace", "prestige": 10, "loyalty": -2}, "chain_tag": "demon_trace_alarm"},
+				{"label": "暂记入案，不惊动门人", "effects": {"action": "record_demon_trace"}, "chain_tag": "demon_trace_recorded"},
+			],
+		},
+		{
+			"id": "demon_whisper_disciple",
+			"name": "夜归弟子",
+			"description": "近日有弟子夜间独自出入山门，醒来后却说不清去了何处。几名弟子私下提到，梦中听见有人在后山唤名。",
+			"scope": "disciple",
+			"rarity": "uncommon",
+			"cooldown": 12,
+			"conditions": {"chain_has": "demon_trace_found", "min_disciples": 3},
+			"choices": [
+				{"label": "查问夜归弟子", "effects": {"action": "inspect_demon_whisper", "loyalty": -3}, "chain_tag": "demon_suspect_seen"},
+				{"label": "安抚心神，暂不定罪", "effects": {"action": "calm_demon_whisper", "spirit_stones": -40}, "chain_tag": "demon_whisper_calmed"},
+				{"label": "交由任职弟子暗中观察", "effects": {"action": "observe_demon_whisper"}, "chain_tag": "demon_watch_started"},
+			],
+		},
+		{
+			"id": "demon_cult_cache",
+			"name": "残页暗格",
+			"description": "整理旧库房时，弟子在梁柱暗格里发现半页残卷。纸面记载的不是功法，而是一串通往南方封魔洞的旧阵坐标。",
+			"scope": "sect",
+			"rarity": "rare",
+			"cooldown": 18,
+			"conditions": {"chain_has": "demon_suspect_seen"},
+			"choices": [
+				{"label": "封存残卷，追查来源", "effects": {"action": "uncover_demon_cache", "spirit_stones": -80}, "chain_tag": "demon_cache_uncovered"},
+				{"label": "公开残卷，警醒门人", "effects": {"action": "purge_demon_trace", "prestige": 20, "loyalty": 3}, "chain_tag": "demon_cache_public"},
+				{"label": "暂交藏经阁收录", "effects": {"action": "record_demon_trace"}, "chain_tag": "demon_cache_recorded"},
+			],
+		},
 	]
 
 
@@ -473,6 +516,17 @@ func _check_conditions(conditions: Dictionary, sect: Resource) -> bool:
 			return false
 	if conditions.has("max_year") and TimeManager.year > conditions["max_year"]:
 		return false
+	if conditions.has("chain_has") and not event_chain_state.has(conditions["chain_has"]):
+		return false
+	if conditions.has("chain_missing") and event_chain_state.has(conditions["chain_missing"]):
+		return false
+	if conditions.has("chain_value_min"):
+		var rule = conditions["chain_value_min"]
+		if typeof(rule) == TYPE_DICTIONARY:
+			var key = rule.get("key", "")
+			var value = int(rule.get("value", 0))
+			if int(event_chain_state.get(key, 0)) < value:
+				return false
 	if conditions.has("missing_item") and _has_inventory_item(sect, conditions["missing_item"]):
 		return false
 	if conditions.has("min_progress"):
@@ -658,6 +712,16 @@ func _make_impact_summary(event: Dictionary, selected: Dictionary, result: Dicti
 			return _with_handler_impact({"summary": "门内秩序得到处理，弟子会观察掌门后续赏罚。", "months": 2, "severity": "neutral"}, influence)
 		"record_generation_oath", "reward_generation_oath":
 			return _with_handler_impact({"summary": "初代弟子的归属感增强，此事成为宗门早期记忆。", "months": 6, "severity": "good"}, influence)
+		"investigate_demon_trace", "observe_demon_whisper", "uncover_demon_cache":
+			return _with_handler_impact({"summary": "魔修渗透线索已被整理，世界地图会持续标记相关异动。", "months": 5, "severity": "warning"}, influence)
+		"purge_demon_trace":
+			return _with_handler_impact({"summary": "山门戒备提高，暗处之人短期内不敢轻动。", "months": 3, "severity": "good"}, influence)
+		"inspect_demon_whisper":
+			return _with_handler_impact({"summary": "被查问弟子暂受关注，门内对魔修暗线的议论增加。", "months": 4, "severity": "warning"}, influence)
+		"calm_demon_whisper":
+			return _with_handler_impact({"summary": "弟子心神暂稳，但梦中低语的来源仍未查清。", "months": 4, "severity": "neutral"}, influence)
+		"record_demon_trace":
+			return _with_handler_impact({"summary": "线索被收录入案，暂不惊动门人。", "months": 2, "severity": "neutral"}, influence)
 		_:
 			return _with_handler_impact({"summary": "此事已归档，目前没有持续影响。", "months": 0, "severity": "neutral"}, influence)
 
@@ -796,6 +860,20 @@ func _apply_event_effects(effects: Dictionary) -> Dictionary:
 			_action_record_generation_oath(result)
 		"reward_generation_oath":
 			_action_reward_generation_oath(result)
+		"investigate_demon_trace":
+			_action_investigate_demon_trace(result)
+		"purge_demon_trace":
+			_action_purge_demon_trace(result)
+		"record_demon_trace":
+			_action_record_demon_trace(result)
+		"inspect_demon_whisper":
+			_action_inspect_demon_whisper(result)
+		"calm_demon_whisper":
+			_action_calm_demon_whisper(result)
+		"observe_demon_whisper":
+			_action_observe_demon_whisper(result)
+		"uncover_demon_cache":
+			_action_uncover_demon_cache(result)
 		"nothing":
 			pass
 
@@ -1062,6 +1140,90 @@ func _action_reward_generation_oath(result: Dictionary) -> void:
 	result["messages"].append("弟子士气大振，修为略有增长。")
 
 
+func _action_investigate_demon_trace(result: Dictionary) -> void:
+	var investigator = _get_best_demon_investigator()
+	if investigator:
+		investigator.add_memory("宗门历%d年 暗查后山魔痕，发现符灰曾被引向南方封魔旧阵。" % TimeManager.year)
+		investigator.comprehension = mini(100, investigator.comprehension + 1)
+		result["messages"].append("%s 查得魔痕与封魔旧阵有关。" % investigator.disciple_name)
+	else:
+		result["messages"].append("魔痕已入案，但暂无弟子能进一步追查。")
+	event_chain_state["demon_clue_count"] = int(event_chain_state.get("demon_clue_count", 0)) + 1
+	event_chain_state["demon_trace_found"] = TimeManager.year
+	EventBus.lore_unlocked.emit("world_incident:demon_infiltration_home")
+
+
+func _action_purge_demon_trace(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	if sect:
+		sect.karma += 2
+	for d in sect.disciples:
+		if d.alive and d.assigned_task == "guarding":
+			d.add_memory("宗门历%d年 山门戒严时参与巡查，见后山魔痕被封存。" % TimeManager.year)
+	result["messages"].append("山门戒严，巡查弟子开始记录异常动静。")
+	event_chain_state["demon_alert"] = int(event_chain_state.get("demon_alert", 0)) + 1
+	event_chain_state["demon_trace_found"] = TimeManager.year
+
+
+func _action_record_demon_trace(result: Dictionary) -> void:
+	var target = _get_best_skill_disciple("formation")
+	if target:
+		target.add_memory("宗门历%d年 整理魔痕记录时，察觉其纹路近似古阵残角。" % TimeManager.year)
+	result["messages"].append("线索被收进宗门纪事，暂不惊动门人。")
+	event_chain_state["demon_clue_count"] = int(event_chain_state.get("demon_clue_count", 0)) + 1
+	event_chain_state["demon_trace_found"] = TimeManager.year
+
+
+func _action_inspect_demon_whisper(result: Dictionary) -> void:
+	var target = _get_low_loyalty_disciple()
+	if not target:
+		target = _get_most_advanced_disciple()
+	if not target:
+		result["messages"].append("未找到可查问弟子。")
+		return
+	target.mentality = maxi(10, target.mentality - 2)
+	target.add_memory("宗门历%d年 因夜归异状被查问，心中仍记得梦里有人唤名。" % TimeManager.year)
+	result["messages"].append("%s 被列为观察对象，心性 -2。" % target.disciple_name)
+	event_chain_state["demon_suspect_id"] = target.disciple_id
+	event_chain_state["demon_suspect_seen"] = TimeManager.year
+	event_chain_state["demon_clue_count"] = int(event_chain_state.get("demon_clue_count", 0)) + 1
+
+
+func _action_calm_demon_whisper(result: Dictionary) -> void:
+	var target = _get_low_mentality_disciple()
+	if not target:
+		result["messages"].append("弟子心神暂稳。")
+		return
+	target.mentality = mini(100, target.mentality + 4)
+	target.loyalty = mini(100, target.loyalty + 2)
+	target.add_memory("宗门历%d年 梦中低语扰心，得宗门安抚后逐渐平静。" % TimeManager.year)
+	result["messages"].append("%s 心性 +4，忠诚 +2。" % target.disciple_name)
+	event_chain_state["demon_suspect_seen"] = TimeManager.year
+
+
+func _action_observe_demon_whisper(result: Dictionary) -> void:
+	var observer = _get_best_demon_investigator()
+	if observer:
+		observer.add_memory("宗门历%d年 暗中观察夜归异状，记下几处通往封魔旧阵的脚印。" % TimeManager.year)
+		observer.mentality = mini(100, observer.mentality + 1)
+		result["messages"].append("%s 暗中观察，发现更多脚印线索。" % observer.disciple_name)
+	event_chain_state["demon_suspect_seen"] = TimeManager.year
+	event_chain_state["demon_clue_count"] = int(event_chain_state.get("demon_clue_count", 0)) + 1
+
+
+func _action_uncover_demon_cache(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	if sect:
+		sect.add_resource(sect.rare_materials, "demon_ink", 1)
+	var target = _get_best_skill_disciple("formation")
+	if target:
+		target.skills["formation"] = mini(100, target.skills.get("formation", 0) + 4)
+		target.add_memory("宗门历%d年 破开残页暗格，确认本门山门与封魔旧阵存在旧日牵连。" % TimeManager.year)
+	result["messages"].append("发现魔墨残迹与封魔旧阵坐标，获得魔墨1份。")
+	event_chain_state["demon_clue_count"] = int(event_chain_state.get("demon_clue_count", 0)) + 2
+	EventBus.lore_unlocked.emit("world_incident:demon_cache_uncovered")
+
+
 func _apply_loyalty_change(delta: int) -> void:
 	var sect = GameManager.current_sect
 	if not sect:
@@ -1116,6 +1278,63 @@ func _get_best_skill_disciple(skill_id: String):
 			best_value = value
 			best = d
 	return best
+
+
+func _get_best_demon_investigator():
+	var sect = GameManager.current_sect
+	if not sect:
+		return null
+	var best = null
+	var best_score = -999
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		var score = d.mentality + d.comprehension + int(d.loyalty * 0.5)
+		if "谨慎" in d.personalities:
+			score += 18
+		if "好奇" in d.personalities:
+			score += 12
+		if "忠诚" in d.personalities:
+			score += 10
+		if "贪婪" in d.personalities or "阴狠" in d.personalities:
+			score -= 8
+		if score > best_score:
+			best_score = score
+			best = d
+	return best
+
+
+func _get_low_loyalty_disciple():
+	var sect = GameManager.current_sect
+	if not sect:
+		return null
+	var target = null
+	var lowest = 999
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		var score = int(d.loyalty)
+		if "贪婪" in d.personalities or "阴狠" in d.personalities:
+			score -= 10
+		if score < lowest:
+			lowest = score
+			target = d
+	return target
+
+
+func _get_low_mentality_disciple():
+	var sect = GameManager.current_sect
+	if not sect:
+		return null
+	var target = null
+	var lowest = 999
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		if d.mentality < lowest:
+			lowest = d.mentality
+			target = d
+	return target
 
 
 func _random_root_quality() -> String:

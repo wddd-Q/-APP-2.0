@@ -12,6 +12,9 @@ func _on_month_passed(month: int, year: int) -> void:
 	if not sect:
 		return
 
+	# 0. 设施修建/翻修进度
+	SectController.process_construction()
+
 	# 1. 弟子修炼
 	_process_all_cultivation(sect)
 

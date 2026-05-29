@@ -144,6 +144,10 @@ func get_world_incidents() -> Array[Dictionary]:
 	return world_events.duplicate(true)
 
 
+func refresh_world_incidents() -> void:
+	_refresh_world_incidents()
+
+
 func _refresh_world_incidents() -> void:
 	world_events.clear()
 
@@ -183,6 +187,36 @@ func _refresh_world_incidents() -> void:
 			"name": "星辰阁分阁星盘失准",
 			"severity": "low",
 			"description": "星辰阁分阁封锁山门，外界传闻他们曾在夜间接待魔域来客。",
+		})
+
+	if EventController.event_chain_state.has("demon_trace_found") or EventController.event_chain_state.has("demon_trace_recorded"):
+		world_events.append({
+			"id": "demon_infiltration_home",
+			"type": "宗门疑云",
+			"region_id": "player_home",
+			"name": "本门后山魔痕",
+			"severity": "medium",
+			"description": "后山符灰与南方封魔旧阵有相似纹路。线索仍浅，但足以说明有人曾试探本门山门。",
+		})
+
+	if EventController.event_chain_state.has("demon_suspect_seen") or EventController.event_chain_state.has("demon_watch_started"):
+		world_events.append({
+			"id": "demon_whisper_home",
+			"type": "宗门疑云",
+			"region_id": "player_home",
+			"name": "弟子夜梦低语",
+			"severity": "medium",
+			"description": "门内已有弟子受梦中低语影响。此事未必是叛逃，却可能是魔修渗透的前兆。",
+		})
+
+	if EventController.event_chain_state.has("demon_cache_uncovered"):
+		world_events.append({
+			"id": "demon_cache_uncovered",
+			"type": "人魔战线",
+			"region_id": "sealing_cave",
+			"name": "封魔旧阵坐标浮现",
+			"severity": "high",
+			"description": "本门暗格残页指向封魔洞旧阵坐标。若更多阵钉失衡，人魔战线可能提前逼近中州。",
 		})
 
 

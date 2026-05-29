@@ -202,9 +202,11 @@ func _refresh_facilities(sect: Resource) -> void:
 		row.add_theme_constant_override("separation", 8)
 
 		var label = Label.new()
-		label.text = "%s Lv.%d (维护:%d灵石/月)" % [
+		var build_suffix = "  修建中%d%%" % facility.build_progress if facility.is_building else ""
+		label.text = "%s Lv.%d%s (维护:%d灵石/月)" % [
 			template.get("name", "未知"),
 			facility.level,
+			build_suffix,
 			template.get("maintenance", {}).get(facility.level, 0),
 		]
 		label.add_theme_font_size_override("font_size", 16)

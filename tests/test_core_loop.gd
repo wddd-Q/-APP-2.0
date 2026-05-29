@@ -22,8 +22,10 @@ func run_all_tests() -> void:
 	test_resource_generation()
 	test_monthly_maintenance()
 	test_recruitment_profiles()
+	test_construction_progress()
 	test_event_ledger_panel_build()
 	test_event_handler_personality_influence()
+	test_demon_infiltration_chain()
 	test_onboarding_objectives()
 	test_multiple_months_simulation()
 	test_event_triggering()
@@ -152,6 +154,23 @@ func test_recruitment_profiles() -> void:
 	assert_that(disciple.origin_story != "", "入门弟子应保留来历故事")
 
 
+func test_construction_progress() -> void:
+	print("\n=== 测试: 设施修建动态 ===")
+	GameSetup.setup_new_game("修建测试宗")
+	var sect = GameManager.current_sect
+	sect.spirit_stones = 2000
+	var ok = SectController.build_facility("alchemy_hall")
+	var facility = sect.get_facility("alchemy_hall")
+	assert_that(ok and facility != null, "应能开始修建新设施")
+	assert_that(facility.is_building, "新设施应进入修建动态状态")
+	assert_that(facility.build_progress == 0, "新设施初始修建进度应为0")
+
+	TimeManager.advance_month()
+	assert_that(facility.build_progress > 0, "推进月份后修建进度应增加")
+	TimeManager.advance_month()
+	assert_that(not facility.is_building and facility.build_progress == 100, "修建进度完成后应退出修建状态")
+
+
 func test_event_ledger_panel_build() -> void:
 	print("\n=== 测试: 宗门纪事面板 ===")
 	GameSetup.setup_new_game("纪事测试宗")
@@ -186,6 +205,26 @@ func test_event_handler_personality_influence() -> void:
 	assert_that(not result.get("handler_influence", {}).is_empty(), "结算结果应记录性格影响")
 	assert_that(not EventController.event_records.is_empty(), "处理后应生成纪事归档")
 	assert_that(str(handler.life_memories[-1]).contains("受命处理宗门纪事"), "受命弟子应获得处理纪事记忆")
+
+
+func test_demon_infiltration_chain() -> void:
+	print("\n=== 测试: 魔修渗透事件链 ===")
+	GameSetup.setup_new_game("暗线测试宗")
+	var sect = GameManager.current_sect
+	sect.spirit_stones = 1000
+	var event = _find_event_template("demon_trace_outer_path").duplicate(true)
+	EventController.active_events = [event]
+	var result = EventController.resolve_choice(event["id"], 0)
+
+	assert_that(not result.get("blocked", false), "魔修线索事件应可处理")
+	assert_that(EventController.event_chain_state.has("demon_trace_found"), "处理后应写入魔修暗线状态")
+	assert_that(int(EventController.event_chain_state.get("demon_clue_count", 0)) >= 1, "处理后应累计魔修线索")
+	var incidents = WorldController.get_world_incidents()
+	var has_home_incident = false
+	for incident in incidents:
+		if incident.get("id", "") == "demon_infiltration_home":
+			has_home_incident = true
+	assert_that(has_home_incident, "世界地图应出现本门魔修疑云标记")
 
 
 func test_onboarding_objectives() -> void:

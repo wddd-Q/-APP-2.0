@@ -18,6 +18,8 @@ func build_facility(type: String) -> bool:
 	var facility = FacilityData.new()
 	facility.facility_type = type
 	facility.level = 1
+	facility.is_building = true
+	facility.build_progress = 0
 	sect.facilities.append(facility)
 
 	EventBus.facility_built.emit(type, 1)
@@ -39,10 +41,30 @@ func upgrade_facility(type: String) -> bool:
 		return false
 
 	facility.level = next_level
+	facility.is_building = true
+	facility.build_progress = 35
 
 	EventBus.facility_upgraded.emit(type, next_level)
 	EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)
 	return true
+
+
+func process_construction() -> void:
+	var sect = GameManager.current_sect
+	if not sect:
+		return
+	var changed = false
+	for facility in sect.facilities:
+		if not facility.is_building:
+			continue
+		facility.build_progress = mini(100, int(facility.build_progress) + 50)
+		changed = true
+		if facility.build_progress >= 100:
+			facility.is_building = false
+			facility.build_progress = 100
+			EventBus.facility_upgraded.emit(facility.facility_type, facility.level)
+	if changed:
+		EventBus.facility_built.emit("", 0)
 
 
 func check_rank_promotion() -> bool:
