@@ -436,6 +436,11 @@ func _load_world_lore() -> void:
 			"content": "本门山门虽破败，却有几处阵基深埋地下，材质远超寻常小宗门所能负担。若将这些阵基位置连成一线，隐约指向南方封魔洞。或许这座山门曾是某个大阵的边角，也或许只是旧时代遗留的巧合。",
 			"unlock_condition": "discover_region:player_home",
 		},
+		"story_04": {
+			"category": "暗线线索", "title": "掌门初任", "era_tag": 4,
+			"content": "招徒、修缮、任职、纪事四件事落定之后，宗门终于像一座真正运转起来的山门。也正是在整理旧库房时，弟子们发现数枚残缺阵钉。阵钉纹路与封魔洞附近出土的旧阵纹相似，说明本门山门或许曾是苍梧旧约封印体系的一角。",
+			"unlock_condition": "onboarding:old_array",
+		},
 	}
 
 

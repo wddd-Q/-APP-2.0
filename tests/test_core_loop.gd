@@ -23,6 +23,7 @@ func run_all_tests() -> void:
 	test_monthly_maintenance()
 	test_recruitment_profiles()
 	test_event_ledger_panel_build()
+	test_onboarding_objectives()
 	test_multiple_months_simulation()
 	test_event_triggering()
 
@@ -165,6 +166,31 @@ func test_event_ledger_panel_build() -> void:
 	panel.queue_free()
 
 
+func test_onboarding_objectives() -> void:
+	print("\n=== 测试: 掌门初任目标 ===")
+	GameSetup.setup_new_game("初任测试宗")
+	var sect = GameManager.current_sect
+	sect.spirit_stones = 5000
+
+	var start_summary = OnboardingController.get_summary()
+	assert_that(start_summary.get("completed", -1) == 0, "新游戏初任目标应从0开始")
+
+	var candidate = RecruitmentController.generate_candidates(1)[0]
+	RecruitmentController.recruit(candidate)
+	assert_that(OnboardingController.get_summary().get("completed", 0) >= 1, "招收弟子应完成初任收徒目标")
+
+	SectController.build_facility("alchemy_hall")
+	assert_that(_objective_done("improve_facility"), "建设设施应完成初任建设目标")
+
+	SectController.assign_position(sect.disciples[0], "副长老")
+	assert_that(_objective_done("assign_officer"), "任命职位应完成初任任职目标")
+
+	EventController.active_events = [EventController.event_pool[0].duplicate(true)]
+	EventController.resolve_choice(EventController.active_events[0]["id"], 1)
+	assert_that(_objective_done("resolve_event"), "处理纪事应完成初任纪事目标")
+	assert_that(OnboardingController.story_unlocked, "四个初任目标完成后应解锁故事线索")
+
+
 func test_multiple_months_simulation() -> void:
 	print("\n=== 测试: 多年模拟 ===")
 	GameSetup.setup_new_game("模拟测试宗")
@@ -208,6 +234,13 @@ func assert_that(condition: bool, message: String) -> void:
 	else:
 		failed += 1
 		print("  ✗ %s  [失败]" % message)
+
+
+func _objective_done(objective_id: String) -> bool:
+	for objective in OnboardingController.objectives:
+		if objective.get("id", "") == objective_id:
+			return objective.get("completed", false)
+	return false
 
 
 func print_summary() -> void:

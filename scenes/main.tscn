@@ -95,7 +95,7 @@ layout_mode = 0
 offset_left = 20.0
 offset_top = 20.0
 offset_right = 1860.0
-offset_bottom = 100.0
+offset_bottom = 270.0
 
 [node name="SectNameLabel" type="Label" parent="MainView/TabContainer/SectOverview/SectInfo"]
 layout_mode = 2
@@ -110,7 +110,7 @@ text = "九品宗门"
 [node name="Facilities" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
 layout_mode = 0
 offset_left = 20.0
-offset_top = 120.0
+offset_top = 300.0
 offset_right = 600.0
 offset_bottom = 900.0
 
@@ -125,7 +125,7 @@ layout_mode = 2
 [node name="Disciples" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
 layout_mode = 0
 offset_left = 620.0
-offset_top = 120.0
+offset_top = 300.0
 offset_right = 1240.0
 offset_bottom = 900.0
 
@@ -140,7 +140,7 @@ layout_mode = 2
 [node name="Resources" type="VBoxContainer" parent="MainView/TabContainer/SectOverview"]
 layout_mode = 0
 offset_left = 1260.0
-offset_top = 120.0
+offset_top = 300.0
 offset_right = 1860.0
 offset_bottom = 900.0
 

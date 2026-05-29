@@ -15,6 +15,7 @@ var _recruit_panel: DiscipleRecruitPanel
 var _detail_panel: DiscipleDetailPanel
 var _recruit_btn: Button
 var _build_selector: OptionButton
+var _onboarding_box: VBoxContainer
 
 
 func _ready() -> void:
@@ -25,6 +26,7 @@ func _ready() -> void:
 	EventBus.disciple_recruited.connect(_on_disciples_changed)
 	EventBus.disciple_died.connect(_on_disciples_changed)
 	EventBus.game_started.connect(_on_game_started)
+	EventBus.onboarding_changed.connect(_refresh_onboarding)
 
 	var root = get_node("../../..")
 	_recruit_panel = root.get_node("DiscipleRecruitPanel")
@@ -36,6 +38,7 @@ func _ready() -> void:
 	_recruit_btn.pressed.connect(_on_recruit_pressed)
 	$Disciples.add_child(_recruit_btn)
 	$Disciples.move_child(_recruit_btn, 1)
+	_create_onboarding_box()
 
 	if GameManager.current_sect:
 		_refresh(TimeManager.month, TimeManager.year)
@@ -56,6 +59,63 @@ func _refresh(_month: int, _year: int) -> void:
 	_refresh_disciples_brief(sect)
 	_refresh_resources(sect)
 	_refresh_decrees(sect)
+	_refresh_onboarding()
+
+
+func _create_onboarding_box() -> void:
+	_onboarding_box = VBoxContainer.new()
+	_onboarding_box.name = "OnboardingObjectives"
+	_onboarding_box.add_theme_constant_override("separation", 6)
+	_onboarding_box.custom_minimum_size = Vector2(0, 150)
+	$SectInfo.add_child(_onboarding_box)
+
+
+func _refresh_onboarding() -> void:
+	if not _onboarding_box:
+		return
+	for child in _onboarding_box.get_children():
+		child.queue_free()
+
+	var summary = OnboardingController.get_summary()
+	var completed = summary.get("completed", 0)
+	var total = summary.get("total", 0)
+
+	var title = Label.new()
+	title.text = "掌门初任目标  %d/%d" % [completed, total]
+	title.add_theme_font_size_override("font_size", 20)
+	title.add_theme_color_override("font_color", Color(0.92, 0.82, 0.48, 1.0))
+	_onboarding_box.add_child(title)
+
+	var next = summary.get("next", {})
+	if summary.get("story_unlocked", false):
+		var complete = Label.new()
+		complete.text = "初任诸事已定：本门旧阵基线索已收入修真史记。"
+		complete.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		complete.add_theme_color_override("font_color", Color(0.62, 0.92, 0.62, 1.0))
+		_onboarding_box.add_child(complete)
+	elif not next.is_empty():
+		var next_label = Label.new()
+		next_label.text = "下一步：%s" % next.get("title", "")
+		next_label.add_theme_font_size_override("font_size", 16)
+		next_label.add_theme_color_override("font_color", Color(0.86, 0.8, 0.64, 1.0))
+		_onboarding_box.add_child(next_label)
+
+		var desc = Label.new()
+		desc.text = "%s\n%s" % [next.get("description", ""), next.get("hint", "")]
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc.add_theme_font_size_override("font_size", 14)
+		desc.add_theme_color_override("font_color", Color(0.72, 0.68, 0.55, 1.0))
+		_onboarding_box.add_child(desc)
+
+	for objective in OnboardingController.objectives:
+		var line = Label.new()
+		line.text = "%s %s" % ["✓" if objective.get("completed", false) else "□", objective.get("title", "")]
+		line.add_theme_font_size_override("font_size", 14)
+		line.add_theme_color_override(
+			"font_color",
+			Color(0.58, 0.88, 0.62, 1.0) if objective.get("completed", false) else Color(0.72, 0.68, 0.55, 1.0)
+		)
+		_onboarding_box.add_child(line)
 
 
 func _refresh_facilities(sect: Resource) -> void:

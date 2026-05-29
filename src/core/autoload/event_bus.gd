@@ -56,5 +56,8 @@ signal position_changed(disciple_id: String, old_pos: String, new_pos: String)
 ## 背景故事信号
 signal lore_unlocked(entry_id: String)
 
+## 前期目标信号
+signal onboarding_changed
+
 ## 战斗信号
 signal combat_finished(result: CombatResult)
