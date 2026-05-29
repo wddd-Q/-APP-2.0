@@ -177,7 +177,8 @@ func _process_aging(sect: Resource) -> void:
 		# 寿元检查
 		if disciple.age >= disciple.lifespan + life_ext:
 			disciple.alive = false
-			EventBus.disciple_died.emit(disciple.resource_path, "寿尽坐化")
+			disciple.add_memory("宗门历%d年 寿尽坐化。" % TimeManager.year)
+			EventBus.disciple_died.emit(disciple.disciple_id, "寿尽坐化")
 
 		# 衰老效果
 		var realm_data = DataRegistry.cultivation_realms.get(disciple.realm, {})

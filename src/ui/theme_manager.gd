@@ -285,8 +285,8 @@ func _apply_background() -> void:
 	if not main or not main.has_node("Background"):
 		return
 
-	var bg_rect: ColorRect = main.get_node("Background")
-	if not bg_rect:
+	var bg_node: Node = main.get_node("Background")
+	if not bg_node:
 		return
 
 	# 创建渐变纹理 — 从上到下的墨色渐变
@@ -302,10 +302,41 @@ func _apply_background() -> void:
 	gradient_tex.height = 256
 	gradient_tex.fill = GradientTexture2D.FILL_LINEAR
 
-	bg_rect.material = null  # 清除可能的旧材质
-	bg_rect.texture = gradient_tex
-	bg_rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	bg_rect.color = Color.WHITE  # 让纹理原色显示
+	_set_background_texture(bg_node, gradient_tex)
+
+func _set_background_texture(bg_node: Node, bg_tex: Texture2D) -> void:
+	if not bg_node or not bg_tex:
+		return
+
+	if bg_node is Control:
+		var bg_control := bg_node as Control
+		bg_control.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		bg_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	if bg_node is TextureRect:
+		var texture_rect := bg_node as TextureRect
+		texture_rect.texture = bg_tex
+		texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		texture_rect.modulate = Color.WHITE
+		return
+
+	if bg_node is ColorRect:
+		var color_rect := bg_node as ColorRect
+		color_rect.color = Color.WHITE
+		var art_rect := color_rect.get_node_or_null("ArtTexture") as TextureRect
+		if not art_rect:
+			art_rect = TextureRect.new()
+			art_rect.name = "ArtTexture"
+			art_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			color_rect.add_child(art_rect)
+			color_rect.move_child(art_rect, 0)
+		art_rect.texture = bg_tex
+		art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		art_rect.modulate = Color.WHITE
+
 
 
 ## 使用程序化纹理（升级版主题）
@@ -323,10 +354,10 @@ func apply_theme_with_textures() -> void:
 	if btn_tex:
 		var btn_normal = StyleBoxTexture.new()
 		btn_normal.texture = btn_tex
-		btn_normal.texture_margin_left = 8
-		btn_normal.texture_margin_right = 8
-		btn_normal.texture_margin_top = 4
-		btn_normal.texture_margin_bottom = 4
+		btn_normal.texture_margin_left = 56
+		btn_normal.texture_margin_right = 56
+		btn_normal.texture_margin_top = 24
+		btn_normal.texture_margin_bottom = 24
 		btn_normal.modulate_color = Color.WHITE
 		_theme.set_stylebox("normal", "Button", btn_normal)
 
@@ -334,20 +365,20 @@ func apply_theme_with_textures() -> void:
 	if btn_hover_tex:
 		var btn_hover = StyleBoxTexture.new()
 		btn_hover.texture = btn_hover_tex
-		btn_hover.texture_margin_left = 8
-		btn_hover.texture_margin_right = 8
-		btn_hover.texture_margin_top = 4
-		btn_hover.texture_margin_bottom = 4
+		btn_hover.texture_margin_left = 56
+		btn_hover.texture_margin_right = 56
+		btn_hover.texture_margin_top = 24
+		btn_hover.texture_margin_bottom = 24
 		_theme.set_stylebox("hover", "Button", btn_hover)
 
 	var btn_pressed_tex = tg.get_texture("btn_pressed")
 	if btn_pressed_tex:
 		var btn_pressed = StyleBoxTexture.new()
 		btn_pressed.texture = btn_pressed_tex
-		btn_pressed.texture_margin_left = 8
-		btn_pressed.texture_margin_right = 8
-		btn_pressed.texture_margin_top = 4
-		btn_pressed.texture_margin_bottom = 4
+		btn_pressed.texture_margin_left = 56
+		btn_pressed.texture_margin_right = 56
+		btn_pressed.texture_margin_top = 24
+		btn_pressed.texture_margin_bottom = 24
 		_theme.set_stylebox("pressed", "Button", btn_pressed)
 
 	_theme.set_color("font_color", "Button", COLOR_GOLD)
@@ -358,10 +389,10 @@ func apply_theme_with_textures() -> void:
 	if panel_tex:
 		var panel_style = StyleBoxTexture.new()
 		panel_style.texture = panel_tex
-		panel_style.texture_margin_left = 10
-		panel_style.texture_margin_right = 10
-		panel_style.texture_margin_top = 10
-		panel_style.texture_margin_bottom = 10
+		panel_style.texture_margin_left = 64
+		panel_style.texture_margin_right = 64
+		panel_style.texture_margin_top = 64
+		panel_style.texture_margin_bottom = 64
 		# 画金边
 		var border_tex = tg.get_texture("border_gold")
 		if border_tex:
@@ -379,10 +410,10 @@ func apply_theme_with_textures() -> void:
 	if tab_tex:
 		var tab_style = StyleBoxTexture.new()
 		tab_style.texture = tab_tex
-		tab_style.texture_margin_left = 6
-		tab_style.texture_margin_right = 6
-		tab_style.texture_margin_top = 4
-		tab_style.texture_margin_bottom = 4
+		tab_style.texture_margin_left = 36
+		tab_style.texture_margin_right = 36
+		tab_style.texture_margin_top = 18
+		tab_style.texture_margin_bottom = 18
 		_theme.set_stylebox("tab_selected", "TabContainer", tab_style)
 		_theme.set_stylebox("tab_unselected", "TabContainer", tab_style)
 
@@ -391,10 +422,10 @@ func apply_theme_with_textures() -> void:
 	if opt_tex:
 		var opt_style = StyleBoxTexture.new()
 		opt_style.texture = opt_tex
-		opt_style.texture_margin_left = 6
-		opt_style.texture_margin_right = 6
-		opt_style.texture_margin_top = 4
-		opt_style.texture_margin_bottom = 4
+		opt_style.texture_margin_left = 48
+		opt_style.texture_margin_right = 48
+		opt_style.texture_margin_top = 22
+		opt_style.texture_margin_bottom = 22
 		_theme.set_stylebox("normal", "OptionButton", opt_style)
 	_theme.set_color("font_color", "OptionButton", COLOR_TEXT)
 
@@ -432,12 +463,10 @@ func _apply_textured_background(tg: Node) -> void:
 	var main = tree.root.get_child(0) if tree.root.get_child_count() > 0 else null
 	if not main or not main.has_node("Background"):
 		return
-	var bg_rect: ColorRect = main.get_node("Background")
-	if not bg_rect:
+	var bg_node: Node = main.get_node("Background")
+	if not bg_node:
 		return
 
 	var bg_tex = tg.get_texture("bg_main")
 	if bg_tex:
-		bg_rect.texture = bg_tex
-		bg_rect.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		bg_rect.color = Color.WHITE
+		_set_background_texture(bg_node, bg_tex)

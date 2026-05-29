@@ -31,7 +31,7 @@ func test_new_game_setup() -> void:
 
 	var sect = GameManager.current_sect
 	assert_that(sect.name == "测试宗门", "宗门名称应为测试宗门")
-	assert_that(sect.spirit_stones == 100, "初始灵石应为100")
+	assert_that(sect.spirit_stones == 300, "初始灵石应为300")
 	assert_that(sect.facilities.size() == 2, "应有2个初始设施")
 	assert_that(sect.disciples.size() == 3, "应有3个初始弟子")
 	assert_that(sect.herbs["spirit_herb"] == 20, "应有20株灵草")
@@ -39,6 +39,8 @@ func test_new_game_setup() -> void:
 
 	var senior = sect.disciples[0]
 	assert_that(senior.sub_realm == 8, "大弟子应为练气八层")
+	assert_that(senior.disciple_id != "", "初始弟子应拥有稳定ID")
+	assert_that(not senior.life_memories.is_empty(), "初始弟子应拥有入门记忆")
 
 
 func test_disciples_cultivate() -> void:

@@ -77,28 +77,30 @@ func dispatch_expedition(dungeon_id: String, disciple_ids: Array, allied_faction
 	if disciple_ids.size() > d.max_disciple_count:
 		return {"success": false, "error": "弟子人数超过上限（最多%d人）" % d.max_disciple_count}
 
+	# 找到并验证弟子。验证通过后再扣费和改变任务，避免失败时留下半完成状态。
+	var dispatched: Array = []
+	for did in disciple_ids:
+		var disciple = sect.get_disciple_by_id(did)
+		if disciple and disciple.alive:
+			if disciple.assigned_task != "idle":
+				return {"success": false, "error": "%s 正在执行其他任务" % disciple.disciple_name}
+			if disciple.realm < d.min_disciple_realm:
+				return {"success": false, "error": "%s 境界不足" % disciple.disciple_name}
+			dispatched.append(disciple)
+
+	if dispatched.size() < d.min_disciple_count:
+		return {"success": false, "error": "符合条件的弟子不足"}
+
 	# 派遣费
 	var cost = d.difficulty * 20
 	if not sect.spend_spirit_stones(cost):
 		return {"success": false, "error": "灵石不足（需要%d）" % cost}
 	EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)
 
-	# 找到弟子并设置状态
-	var dispatched: Array = []
-	for did in disciple_ids:
-		for disciple in sect.disciples:
-			if disciple.resource_path == did and disciple.alive:
-				if disciple.assigned_task != "idle":
-					return {"success": false, "error": "%s 正在执行其他任务" % disciple.disciple_name}
-				if disciple.realm < d.min_disciple_realm:
-					return {"success": false, "error": "%s 境界不足" % disciple.disciple_name}
-				disciple.assigned_task = "exploring"
-				disciple.set_meta("location", dungeon_id)
-				dispatched.append(disciple)
-				break
-
-	if dispatched.size() < d.min_disciple_count:
-		return {"success": false, "error": "符合条件的弟子不足"}
+	for disciple in dispatched:
+		disciple.assigned_task = "exploring"
+		disciple.set_meta("location", dungeon_id)
+		disciple.add_memory("宗门历%d年 受命探索%s。" % [TimeManager.year, d.dungeon_name])
 
 	# 消耗盟友关系
 	if allied_faction != "":
@@ -148,11 +150,10 @@ func _resolve_expedition(exp: Dictionary) -> void:
 	# 恢复弟子状态
 	var sect = GameManager.current_sect
 	for did in exp["disciple_ids"]:
-		for disciple in sect.disciples:
-			if disciple.resource_path == did:
-				disciple.assigned_task = "idle"
-				disciple.remove_meta("location")
-				break
+		var disciple = sect.get_disciple_by_id(did)
+		if disciple:
+			disciple.assigned_task = "idle"
+			disciple.remove_meta("location")
 
 	# 计算战力（含演武场加成）
 	var arena = sect.get_facility("arena")
@@ -161,10 +162,9 @@ func _resolve_expedition(exp: Dictionary) -> void:
 		arena_mult = 1.0 + DataRegistry.facility_templates.get("arena", {}).get("combat_bonus", {}).get(arena.level, 0.0)
 	var total_power = 0.0
 	for did in exp["disciple_ids"]:
-		for disciple in sect.disciples:
-			if disciple.resource_path == did:
-				total_power += (disciple.realm * 10 + disciple.sub_realm * 2) * arena_mult
-				break
+		var disciple = sect.get_disciple_by_id(did)
+		if disciple:
+			total_power += (disciple.realm * 10 + disciple.sub_realm * 2) * arena_mult
 
 	# 盟友加成
 	if exp["allied_faction"] != "":
@@ -183,15 +183,20 @@ func _resolve_expedition(exp: Dictionary) -> void:
 	var result_msg = ""
 	if success:
 		result_msg = "探索%s成功！" % d.dungeon_name
+		for did in exp["disciple_ids"]:
+			var disciple = sect.get_disciple_by_id(did)
+			if disciple:
+				disciple.add_memory("宗门历%d年 完成%s探索，带回宗门机缘。" % [TimeManager.year, d.dungeon_name])
 	else:
 		result_msg = "探索%s失败，弟子们无功而返。" % d.dungeon_name
 		# 失败惩罚：部分弟子受伤
 		for did in exp["disciple_ids"]:
+			var disciple = sect.get_disciple_by_id(did)
+			if disciple:
+				disciple.add_memory("宗门历%d年 探索%s失利。" % [TimeManager.year, d.dungeon_name])
 			if randf() < 0.3:
-				for disciple in sect.disciples:
-					if disciple.resource_path == did:
-						disciple.cultivation_progress = maxf(0.0, disciple.cultivation_progress - 0.2)
-						break
+				if disciple:
+					disciple.cultivation_progress = maxf(0.0, disciple.cultivation_progress - 0.2)
 
 	EventBus.dungeon_expedition_finished.emit(dungeon_id, success, loot)
 
@@ -250,10 +255,9 @@ func get_active_expedition_text() -> String:
 		var disciple_names: Array[String] = []
 		var sect = GameManager.current_sect
 		for did in exp["disciple_ids"]:
-			for disc in sect.disciples:
-				if disc.resource_path == did:
-					disciple_names.append(disc.disciple_name)
-					break
+			var disc = sect.get_disciple_by_id(did)
+			if disc:
+				disciple_names.append(disc.disciple_name)
 
 		texts.append("%s — %s（剩余%d月）%s" % [
 			d.dungeon_name,

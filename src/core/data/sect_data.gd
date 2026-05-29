@@ -28,6 +28,63 @@ extends Resource
 
 ## 门规
 @export var active_decrees: Array[String] = []
+@export var next_disciple_serial: int = 1
+
+
+func assign_disciple_id(disciple: Resource) -> void:
+	if not disciple or disciple.disciple_id != "":
+		return
+	disciple.disciple_id = "disciple_%04d" % next_disciple_serial
+	next_disciple_serial += 1
+
+
+func ensure_disciple_ids() -> void:
+	for disciple in disciples:
+		assign_disciple_id(disciple)
+		if disciple.disciple_id.begins_with("disciple_"):
+			var serial = int(disciple.disciple_id.substr("disciple_".length()))
+			next_disciple_serial = maxi(next_disciple_serial, serial + 1)
+
+
+func get_disciple_by_id(disciple_id: String) -> Resource:
+	for disciple in disciples:
+		if disciple.disciple_id == disciple_id:
+			return disciple
+	return null
+
+
+func add_disciple(disciple: Resource) -> void:
+	assign_disciple_id(disciple)
+	disciples.append(disciple)
+
+
+func add_inventory_item(item_id: String, item_name: String, item_type: int, quality: int, quantity: int = 1, effects: Dictionary = {}) -> void:
+	for item in inventory:
+		if item.item_id == item_id and item.quality == quality:
+			item.quantity += quantity
+			return
+
+	var item_data = load("res://src/core/data/item_data.gd").new()
+	item_data.item_id = item_id
+	item_data.item_name = item_name
+	item_data.item_type = item_type
+	item_data.quality = quality
+	item_data.quantity = quantity
+	item_data.effects = effects
+	inventory.append(item_data)
+
+
+func remove_inventory_item(item_id: String, quantity: int = 1) -> bool:
+	for item in inventory:
+		if item.item_id != item_id:
+			continue
+		if item.quantity < quantity:
+			return false
+		item.quantity -= quantity
+		if item.quantity <= 0:
+			inventory.erase(item)
+		return true
+	return false
 
 
 func get_facility(type: String) -> Resource:

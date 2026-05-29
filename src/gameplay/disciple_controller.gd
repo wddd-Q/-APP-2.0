@@ -25,8 +25,9 @@ func recruit_disciple(candidate_data: Dictionary) -> DiscipleData:
 	disciple.sub_realm = 1
 	disciple.lifespan = DataRegistry.cultivation_realms[1]["lifespan"]
 
-	sect.disciples.append(disciple)
-	EventBus.disciple_recruited.emit(disciple.resource_path)
+	sect.add_disciple(disciple)
+	disciple.add_memory("宗门历%d年 %s拜入宗门。" % [TimeManager.year, disciple.disciple_name])
+	EventBus.disciple_recruited.emit(disciple.disciple_id)
 	return disciple
 
 
@@ -89,7 +90,7 @@ func assign_task(disciple: DiscipleData, task_id: String) -> bool:
 		EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)
 
 	disciple.assigned_task = task_id
-	EventBus.disciple_task_assigned.emit(disciple.resource_path, task_id)
+	EventBus.disciple_task_assigned.emit(disciple.disciple_id, task_id)
 	return true
 
 
@@ -166,7 +167,8 @@ func _attempt_realm_breakthrough(disciple: DiscipleData) -> Dictionary:
 
 	var base_chance = _get_realm_base_chance(new_realm)
 	var root_mult = DataRegistry.spirit_roots.get(disciple.spirit_root_quality, {}).get("breakthrough_mult", 1.0)
-	var pill_bonus = _get_pill_bonus(disciple, new_realm)
+	var pill_aid = _consume_breakthrough_aid(disciple, new_realm)
+	var pill_bonus = pill_aid.get("bonus", 0.0)
 	var penalty = disciple.breakthrough_attempts * 0.03
 
 	var chance = clampf((base_chance * root_mult) + pill_bonus - penalty, 0.01, 0.95)
@@ -177,12 +179,23 @@ func _attempt_realm_breakthrough(disciple: DiscipleData) -> Dictionary:
 		disciple.cultivation_progress = 0.0
 		disciple.breakthrough_attempts = 0
 		disciple.lifespan = realm_data.get("lifespan", disciple.lifespan)
+		var realm_name = DataRegistry.get_realm_name(new_realm)
+		var memory = "宗门历%d年 突破至%s。" % [TimeManager.year, realm_name]
+		if pill_aid.has("name"):
+			memory += "突破前服用了%s。" % pill_aid["name"]
+		disciple.add_memory(memory)
 
-		EventBus.disciple_broken_through.emit(disciple.resource_path, new_realm, 1)
+		EventBus.disciple_broken_through.emit(disciple.disciple_id, new_realm, 1)
 		return {"success": true, "type": "realm", "new_realm": new_realm, "new_lifespan": disciple.lifespan}
 
 	disciple.cultivation_progress -= 0.5
 	disciple.breakthrough_attempts += 1
+	if pill_aid.has("name"):
+		disciple.add_memory("宗门历%d年 借%s冲击%s失败，修为受损。" % [
+			TimeManager.year,
+			pill_aid["name"],
+			DataRegistry.get_realm_name(new_realm),
+		])
 	return {"success": false, "reason": "突破大境界失败", "progress_lost": 0.5}
 
 
@@ -191,11 +204,21 @@ func _get_realm_base_chance(realm: int) -> float:
 	return chances.get(realm, 0.10)
 
 
-func _get_pill_bonus(disciple: DiscipleData, target_realm: int) -> float:
-	var pill_map = {2: 0.20, 3: 0.15, 4: 0.12, 5: 0.10, 6: 0.08, 7: 0.05, 8: 0.03}
-	var base = pill_map.get(target_realm, 0.0)
-	# 检查弟子是否带了对应丹药（简化：假设丹药由玩家在突破前消耗）
-	return base
+func _consume_breakthrough_aid(_disciple: DiscipleData, target_realm: int) -> Dictionary:
+	var sect = GameManager.current_sect
+	if not sect:
+		return {}
+
+	var pill_map = {
+		2: {"id": "foundation", "name": "筑基丹", "bonus": 0.20},
+		3: {"id": "golden_core", "name": "结金丹", "bonus": 0.15},
+	}
+	var aid = pill_map.get(target_realm, {})
+	if aid.is_empty():
+		return {}
+	if not sect.remove_inventory_item(aid["id"], 1):
+		return {}
+	return aid
 
 
 func _check_aging(disciple: DiscipleData) -> void:
@@ -211,4 +234,5 @@ func _check_aging(disciple: DiscipleData) -> void:
 
 	if disciple.age >= disciple.lifespan:
 		disciple.alive = false
-		EventBus.disciple_died.emit(disciple.resource_path, "寿尽坐化")
+		disciple.add_memory("宗门历%d年 寿尽坐化。" % TimeManager.year)
+		EventBus.disciple_died.emit(disciple.disciple_id, "寿尽坐化")

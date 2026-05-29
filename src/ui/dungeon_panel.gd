@@ -222,7 +222,7 @@ func _refresh_detail() -> void:
 					DataRegistry.get_realm_name(disc.realm),
 					disc.sub_realm,
 				])
-				sel.set_item_metadata(sel.item_count - 1, disc.resource_path)
+				sel.set_item_metadata(sel.item_count - 1, disc.disciple_id)
 
 	# 盟友选择器
 	_ally_selector.clear()

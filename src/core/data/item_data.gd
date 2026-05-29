@@ -5,6 +5,7 @@ extends Resource
 
 enum ItemType { PILL, MATERIAL, TREASURE, EQUIPMENT, TECHNIQUE_BOOK, RECIPE }
 
+@export var item_id: String = ""
 @export var item_name: String = ""
 @export var item_type: int = ItemType.MATERIAL
 @export var quality: int = 0  # 0=废, 1=下, 2=中, 3=上, 4=极品

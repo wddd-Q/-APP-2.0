@@ -92,6 +92,7 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 	data["prestige"] = sect.get("prestige")
 	data["spirit_stones"] = sect.get("spirit_stones")
 	data["karma"] = sect.get("karma")
+	data["next_disciple_serial"] = sect.get("next_disciple_serial")
 	data["date_string"] = TimeManager.get_date_string()
 	data["year"] = TimeManager.year
 	data["month"] = TimeManager.month
@@ -117,6 +118,7 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 	for d in sect.get("disciples"):
 		var dd = {
 			"name": d.disciple_name,
+			"id": d.disciple_id,
 			"gender": d.gender,
 			"age": d.age,
 			"lifespan": d.lifespan,
@@ -137,6 +139,8 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 			"task": d.assigned_task,
 			"location": d.location,
 			"personalities": d.personalities,
+			"memories": d.life_memories,
+			"position": d.position,
 		}
 		data["disciples"].append(dd)
 
@@ -145,9 +149,12 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 	for item in sect.get("inventory"):
 		data["inventory"].append({
 			"name": item.item_name,
+			"id": item.item_id,
 			"type": item.item_type,
 			"quality": item.quality,
 			"quantity": item.quantity,
+			"description": item.description,
+			"effects": item.effects,
 		})
 
 	# 外交关系
@@ -159,6 +166,7 @@ func _serialize_sect(sect: Resource) -> Dictionary:
 	# 事件状态
 	data["event_history"] = EventController.event_history
 	data["event_chain_state"] = EventController.event_chain_state
+	data["event_cooldowns"] = EventController.event_cooldowns
 
 	return data
 
@@ -172,6 +180,7 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 	sect.prestige = data.get("prestige", 0)
 	sect.spirit_stones = data.get("spirit_stones", 0)
 	sect.karma = data.get("karma", 0)
+	sect.next_disciple_serial = data.get("next_disciple_serial", 1)
 
 	# 恢复时间
 	if data.has("year") and data.has("month"):
@@ -196,6 +205,7 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 	# 弟子
 	for dd in data.get("disciples", []):
 		var d = DiscipleData.new()
+		d.disciple_id = dd.get("id", "")
 		d.disciple_name = dd["name"]
 		d.gender = dd["gender"]
 		d.age = dd["age"]
@@ -217,15 +227,20 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 		d.assigned_task = dd.get("task", "")
 		d.location = dd.get("location", "sect")
 		d.personalities = dd.get("personalities", [])
-		sect.disciples.append(d)
+		d.life_memories = dd.get("memories", [])
+		d.position = dd.get("position", "普通弟子")
+		sect.add_disciple(d)
 
 	# 物品
 	for idata in data.get("inventory", []):
 		var item = ItemData.new()
+		item.item_id = idata.get("id", "")
 		item.item_name = idata["name"]
 		item.item_type = idata["type"]
 		item.quality = idata["quality"]
 		item.quantity = idata["quantity"]
+		item.description = idata.get("description", "")
+		item.effects = idata.get("effects", {})
 		sect.inventory.append(item)
 
 	# 外交
@@ -237,6 +252,7 @@ func _deserialize_sect(data: Dictionary) -> Resource:
 	# 事件状态恢复
 	EventController.event_history = data.get("event_history", [])
 	EventController.event_chain_state = data.get("event_chain_state", {})
+	EventController.event_cooldowns = data.get("event_cooldowns", {})
 
 	return sect
 

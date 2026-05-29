@@ -152,6 +152,8 @@ func _refresh_disciples_brief(sect: Resource) -> void:
 			continue
 
 		# 行容器：头像 + 信息按钮
+		var card = VBoxContainer.new()
+		card.add_theme_constant_override("separation", 4)
 		var row = HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 
@@ -177,7 +179,23 @@ func _refresh_disciples_brief(sect: Resource) -> void:
 		btn.pressed.connect(func(): _detail_panel.show_disciple(disciple))
 		row.add_child(btn)
 
-		disciples_container.add_child(row)
+		card.add_child(row)
+
+		var progress = ProgressBar.new()
+		progress.min_value = 0
+		progress.max_value = 100
+		progress.value = clampf(d.cultivation_progress * 100.0, 0.0, 100.0)
+		progress.custom_minimum_size = Vector2(0, 10)
+		progress.show_percentage = false
+		card.add_child(progress)
+
+		var next_hint = Label.new()
+		next_hint.text = _get_disciple_focus_hint(d)
+		next_hint.add_theme_font_size_override("font_size", 13)
+		next_hint.add_theme_color_override("font_color", Color(0.72, 0.68, 0.55, 1.0))
+		card.add_child(next_hint)
+
+		disciples_container.add_child(card)
 
 
 func _refresh_resources(sect: Resource) -> void:
@@ -185,25 +203,73 @@ func _refresh_resources(sect: Resource) -> void:
 		child.queue_free()
 
 	var main = Label.new()
-	main.text = "灵石: %d" % sect.spirit_stones
+	main.text = "灵石: %d  |  预计月结: %+d" % [sect.spirit_stones, _get_monthly_stone_projection(sect)]
+	main.add_theme_font_size_override("font_size", 18)
+	if _get_monthly_stone_projection(sect) < 0:
+		main.add_theme_color_override("font_color", Color(0.95, 0.38, 0.28, 1.0))
 	resources_container.add_child(main)
+	_add_world_rank_summary()
 
 	if not sect.herbs.is_empty():
 		var herbs_label = Label.new()
-		herbs_label.text = "灵草: " + str(sect.herbs)
+		herbs_label.text = "灵草: " + _format_resource_dict(sect.herbs)
+		herbs_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		resources_container.add_child(herbs_label)
 
 	if not sect.ores.is_empty():
 		var ores_label = Label.new()
-		ores_label.text = "矿石: " + str(sect.ores)
+		ores_label.text = "矿石: " + _format_resource_dict(sect.ores)
+		ores_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		resources_container.add_child(ores_label)
+
+	if not sect.inventory.is_empty():
+		var pills = _count_inventory_by_type(sect, 0)
+		if pills > 0:
+			var pill_label = Label.new()
+			pill_label.text = "丹药库存: %d" % pills
+			resources_container.add_child(pill_label)
+
+
+func _add_world_rank_summary() -> void:
+	var summary = WorldController.get_player_ranking_summary()
+	if summary.is_empty():
+		return
+
+	var entry = summary.get("entry", {})
+	var above = summary.get("above", {})
+	var rank_label = Label.new()
+	if above.is_empty():
+		rank_label.text = "天下排名: 第 %d / %d | 综合 %d | 暂居榜首" % [
+			summary.get("rank", 0),
+			summary.get("total", 0),
+			entry.get("score", 0),
+		]
+	else:
+		rank_label.text = "天下排名: 第 %d / %d | 综合 %d | 距上一名差 %d" % [
+			summary.get("rank", 0),
+			summary.get("total", 0),
+			entry.get("score", 0),
+			summary.get("score_gap", 0),
+		]
+	rank_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rank_label.add_theme_font_size_override("font_size", 16)
+	rank_label.add_theme_color_override("font_color", Color(0.9, 0.78, 0.35, 1.0))
+	resources_container.add_child(rank_label)
 
 
 func _refresh_decrees(sect: Resource) -> void:
-	if sect.active_decrees.is_empty():
-		active_decrees_label.text = "当前门规: 无"
+	var lines: Array[String] = []
+	lines.append("当前门规: " + ("无" if sect.active_decrees.is_empty() else ", ".join(sect.active_decrees)))
+	lines.append("")
+	lines.append("近期宗门记事")
+	var memories = _get_recent_memories(sect, 4)
+	if memories.is_empty():
+		lines.append("尚无重要记录")
 	else:
-		active_decrees_label.text = "当前门规: " + ", ".join(sect.active_decrees)
+		for memory in memories:
+			lines.append("· " + memory)
+	active_decrees_label.text = "\n".join(lines)
+	active_decrees_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 
 func _on_facility_changed(_type: String, _level: int) -> void:
@@ -244,3 +310,77 @@ func _get_task_display(task_id: String) -> String:
 		"teach_wanderers": "教导散修",
 	}
 	return map.get(task_id, task_id)
+
+
+func _get_disciple_focus_hint(disciple: Resource) -> String:
+	var pct = int(clampf(disciple.cultivation_progress * 100.0, 0.0, 100.0))
+	var realm_data = DataRegistry.cultivation_realms.get(disciple.realm, {})
+	var sub_stages = realm_data.get("sub_stages", 1)
+	if disciple.cultivation_progress >= 1.0:
+		return "可尝试突破"
+	if disciple.sub_realm >= sub_stages and disciple.realm == 1 and _has_item("foundation"):
+		return "筑基丹已备，修为进度 %d%%" % pct
+	return "修为进度 %d%%" % pct
+
+
+func _get_monthly_stone_projection(sect: Resource) -> int:
+	var income = 0
+	var vein = sect.get_facility("spirit_vein")
+	if vein:
+		income += DataRegistry.facility_templates.get("spirit_vein", {}).get("stone_output", {}).get(vein.level, 0)
+	for d in sect.disciples:
+		if d.alive and d.assigned_task in DiscipleController.WORK_INCOME:
+			var info = DiscipleController.WORK_INCOME[d.assigned_task]
+			income += int((info["min"] + info["max"]) / 2)
+
+	var upkeep = 0
+	for facility in sect.facilities:
+		upkeep += DataRegistry.facility_templates.get(facility.facility_type, {}).get("maintenance", {}).get(facility.level, 0)
+	for d in sect.disciples:
+		if d.alive:
+			upkeep += SectController.get_position_salary(d.position)
+		if d.alive and d.assigned_task in ["alchemy", "crafting"]:
+			upkeep += DiscipleController.TASK_COSTS.get(d.assigned_task, 0)
+	return income - upkeep
+
+
+func _format_resource_dict(data: Dictionary) -> String:
+	var parts: Array[String] = []
+	for key in data:
+		parts.append("%s %d" % [_get_resource_display_name(key), data[key]])
+	return "，".join(parts)
+
+
+func _get_resource_display_name(raw_id: String) -> String:
+	var name_map = {
+		"spirit_herb": "灵草", "ginseng": "人参", "lingzhi": "灵芝",
+		"iron": "铁矿", "silk": "灵蚕丝", "jade": "灵玉",
+	}
+	return name_map.get(raw_id, raw_id)
+
+
+func _count_inventory_by_type(sect: Resource, item_type: int) -> int:
+	var total = 0
+	for item in sect.inventory:
+		if item.item_type == item_type:
+			total += item.quantity
+	return total
+
+
+func _has_item(item_id: String) -> bool:
+	var sect = GameManager.current_sect
+	if not sect:
+		return false
+	for item in sect.inventory:
+		if item.item_id == item_id and item.quantity > 0:
+			return true
+	return false
+
+
+func _get_recent_memories(sect: Resource, limit: int) -> Array[String]:
+	var result: Array[String] = []
+	for d in sect.disciples:
+		for memory in d.life_memories:
+			result.append("%s：%s" % [d.disciple_name, memory])
+	result.reverse()
+	return result.slice(0, limit)

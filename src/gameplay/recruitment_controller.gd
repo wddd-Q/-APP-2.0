@@ -86,8 +86,9 @@ func recruit(candidate: Dictionary) -> DiscipleData:
 	d.lifespan = 120  # 练气期
 	d.assigned_task = "idle"
 
-	sect.disciples.append(d)
-	EventBus.disciple_recruited.emit(d.resource_path)
+	sect.add_disciple(d)
+	d.add_memory("宗门历%d年 %s通过招徒令拜入宗门。" % [TimeManager.year, d.disciple_name])
+	EventBus.disciple_recruited.emit(d.disciple_id)
 	EventBus.spirit_stones_changed.emit(sect.spirit_stones, -cost)
 	return d
 

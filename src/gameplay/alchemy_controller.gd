@@ -4,6 +4,7 @@ extends Node
 const PillRecipeData = preload("res://src/core/data/pill_recipe_data.gd")
 const DiscipleData = preload("res://src/core/data/disciple_data.gd")
 const CraftRecipeData = preload("res://src/core/data/craft_recipe_data.gd")
+const ItemData = preload("res://src/core/data/item_data.gd")
 
 
 func craft_pill(recipe: PillRecipeData, alchemist: DiscipleData) -> Dictionary:
@@ -52,8 +53,17 @@ func craft_pill(recipe: PillRecipeData, alchemist: DiscipleData) -> Dictionary:
 
 	# 提升技能
 	alchemist.skills["alchemy"] = mini(100, alchemist.skills["alchemy"] + 1)
+	sect.add_inventory_item(recipe.result_item, recipe.recipe_name, ItemData.ItemType.PILL, quality, 1, {
+		"category": "pill",
+		"source": "alchemy",
+	})
+	alchemist.add_memory("宗门历%d年 炼成%s%s。" % [
+		TimeManager.year,
+		_get_quality_name(quality),
+		recipe.recipe_name,
+	])
 
-	EventBus.pill_crafted.emit(recipe.result_item, quality, alchemist.resource_path)
+	EventBus.pill_crafted.emit(recipe.result_item, quality, alchemist.disciple_id)
 	return {
 		"success": true,
 		"pill_id": recipe.result_item,
@@ -97,8 +107,17 @@ func forge_equipment(recipe: CraftRecipeData, crafter: DiscipleData) -> Dictiona
 		quality = 2
 
 	crafter.skills["crafting"] = mini(100, crafter.skills["crafting"] + 1)
+	sect.add_inventory_item(recipe.result_item, recipe.recipe_name, ItemData.ItemType.EQUIPMENT, quality, 1, {
+		"category": "equipment",
+		"source": "forge",
+	})
+	crafter.add_memory("宗门历%d年 炼成%s%s。" % [
+		TimeManager.year,
+		_get_quality_name(quality),
+		recipe.recipe_name,
+	])
 
-	EventBus.equipment_forged.emit(recipe.result_item, quality, crafter.resource_path)
+	EventBus.equipment_forged.emit(recipe.result_item, quality, crafter.disciple_id)
 	return {"success": true, "equipment_id": recipe.result_item, "quality": quality}
 
 

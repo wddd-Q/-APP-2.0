@@ -24,6 +24,9 @@ func start_new_game(sect_name: String) -> void:
 	current_sect = SectData.new()
 	current_sect.name = sect_name
 	current_sect.rank = 9
+	TimeManager.year = 1
+	TimeManager.month = 1
+	TimeManager.era = 0
 	game_initialized = true
 	EventBus.game_started.emit()
 
@@ -32,6 +35,7 @@ func load_game(path: String) -> void:
 	var result = SaveManager.load_game(path)
 	if result:
 		current_sect = result
+		current_sect.ensure_disciple_ids()
 		game_initialized = true
 		EventBus.game_loaded.emit()
 

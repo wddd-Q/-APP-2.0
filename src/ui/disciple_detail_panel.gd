@@ -15,6 +15,7 @@ var _attributes_grid: GridContainer
 var _skills_grid: GridContainer
 var _attr_chart: StatRadarChart
 var _skill_chart: StatRadarChart
+var _breakthrough_label: RichTextLabel
 var _personalities_label: Label
 var _relationships_list: VBoxContainer
 var _memories_list: VBoxContainer
@@ -90,6 +91,15 @@ func _build_ui() -> void:
 	var content = VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	scroll.add_child(content)
+
+	# === 突破准备 ===
+	content.add_child(_make_section("突破准备"))
+	_breakthrough_label = RichTextLabel.new()
+	_breakthrough_label.bbcode_enabled = true
+	_breakthrough_label.fit_content = true
+	_breakthrough_label.scroll_active = false
+	_breakthrough_label.add_theme_font_size_override("normal_font_size", 15)
+	content.add_child(_breakthrough_label)
 
 	# === 六维属性（雷达图 + 数值并排）===
 	content.add_child(_make_section("六维属性"))
@@ -242,6 +252,7 @@ func _refresh_all() -> void:
 
 	_personalities_label.text = "人格: " + (", ".join(_current_disciple.personalities) if _current_disciple.personalities else "无明显特征")
 
+	_refresh_breakthrough_info()
 	_refresh_relationships()
 	_refresh_memories()
 	_refresh_position_selector()
@@ -296,10 +307,82 @@ func _refresh_memories() -> void:
 		_memories_list.add_child(lbl)
 		return
 
-	for mem in memories.slice(memories.size() - 5, memories.size()):
+	var start = maxi(0, memories.size() - 8)
+	for mem in memories.slice(start, memories.size()):
 		var lbl = Label.new()
-		lbl.text = "  " + mem
+		lbl.text = "  · " + mem
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_memories_list.add_child(lbl)
+
+
+func _refresh_breakthrough_info() -> void:
+	_breakthrough_label.clear()
+	if not _current_disciple:
+		return
+
+	var realm_data = DataRegistry.cultivation_realms.get(_current_disciple.realm, {})
+	var sub_stages = realm_data.get("sub_stages", 1)
+	var progress_pct = int(clampf(_current_disciple.cultivation_progress * 100.0, 0.0, 100.0))
+	var root_data = DataRegistry.spirit_roots.get(_current_disciple.spirit_root_quality, {})
+	var root_name = root_data.get("name", "未知灵根")
+
+	_breakthrough_label.append_text("修为进度: %d%%\n" % progress_pct)
+	_breakthrough_label.append_text("灵根: %s  |  失败积累: %d次\n" % [root_name, _current_disciple.breakthrough_attempts])
+
+	if _current_disciple.cultivation_progress < 1.0:
+		_breakthrough_label.append_text("[color=#b8ad8c]当前建议: 继续闭关或寻找修为机缘。[/color]")
+		return
+
+	if _current_disciple.sub_realm < sub_stages:
+		var sub_chance = _estimate_sub_breakthrough_chance()
+		_breakthrough_label.append_text("小境界突破预估: %d%%\n" % int(sub_chance * 100.0))
+		_breakthrough_label.append_text("[color=#d9c85f]当前建议: 可以尝试突破小境界。[/color]")
+		return
+
+	var next_realm = _current_disciple.realm + 1
+	var next_name = DataRegistry.get_realm_name(next_realm)
+	if next_name == "未知":
+		_breakthrough_label.append_text("[color=#d9c85f]已抵达当前版本最高可见境界。[/color]")
+		return
+
+	var aid = _get_breakthrough_aid(next_realm)
+	var chance = _estimate_realm_breakthrough_chance(next_realm, aid.get("bonus", 0.0))
+	_breakthrough_label.append_text("大境界目标: %s  |  预估成功率: %d%%\n" % [next_name, int(chance * 100.0)])
+	if aid.is_empty():
+		_breakthrough_label.append_text("[color=#c96f5f]缺少关键丹药，突破风险较高。[/color]")
+	else:
+		_breakthrough_label.append_text("[color=#d9c85f]已备%s，突破时会自动消耗并提高成功率。[/color]" % aid["name"])
+
+
+func _estimate_sub_breakthrough_chance() -> float:
+	var base_chance = 0.7 - (_current_disciple.sub_realm * 0.05)
+	var root_mult = DataRegistry.spirit_roots.get(_current_disciple.spirit_root_quality, {}).get("breakthrough_mult", 1.0)
+	return clampf(base_chance * root_mult, 0.05, 0.95)
+
+
+func _estimate_realm_breakthrough_chance(target_realm: int, pill_bonus: float) -> float:
+	var base_map = {2: 0.25, 3: 0.15, 4: 0.08, 5: 0.04, 6: 0.02, 7: 0.01, 8: 0.005}
+	var base_chance = base_map.get(target_realm, 0.10)
+	var root_mult = DataRegistry.spirit_roots.get(_current_disciple.spirit_root_quality, {}).get("breakthrough_mult", 1.0)
+	var penalty = _current_disciple.breakthrough_attempts * 0.03
+	return clampf((base_chance * root_mult) + pill_bonus - penalty, 0.01, 0.95)
+
+
+func _get_breakthrough_aid(target_realm: int) -> Dictionary:
+	var aid_map = {
+		2: {"id": "foundation", "name": "筑基丹", "bonus": 0.20},
+		3: {"id": "golden_core", "name": "结金丹", "bonus": 0.15},
+	}
+	var aid = aid_map.get(target_realm, {})
+	if aid.is_empty():
+		return {}
+	var sect = GameManager.current_sect
+	if not sect:
+		return {}
+	for item in sect.inventory:
+		if item.item_id == aid["id"] and item.quantity > 0:
+			return aid
+	return {}
 
 
 const TASK_COSTS: Dictionary = {

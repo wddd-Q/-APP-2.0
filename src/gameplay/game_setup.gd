@@ -66,4 +66,5 @@ static func _create_starter_disciple(sect: Resource, dname: String, gender: int,
 	d.lifespan = 120
 	d.personalities = personalities
 
-	sect.disciples.append(d)
+	sect.add_disciple(d)
+	d.add_memory("宗门历%d年 %s入门，成为本门初代弟子。" % [TimeManager.year, d.disciple_name])

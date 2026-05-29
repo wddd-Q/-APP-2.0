@@ -4,6 +4,7 @@ extends Resource
 
 
 ## 属性
+@export var disciple_id: String = ""
 @export var disciple_name: String = ""
 @export var gender: int = 0  # 0=男, 1=女
 @export var age: int = 18
@@ -55,6 +56,14 @@ extends Resource
 @export var position: String = "普通弟子"  # 职位
 @export var location: String = "sect"    # sect/mission/exploring/dead
 @export var life_memories: Array = []  # 关键人生事件记录 ["宗门历25年 筑基成功", ...]
+
+
+func add_memory(text: String) -> void:
+	if text.is_empty():
+		return
+	life_memories.append(text)
+	if life_memories.size() > 30:
+		life_memories.pop_front()
 
 
 func get_cultivation_multiplier() -> float:

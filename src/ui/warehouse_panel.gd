@@ -228,7 +228,11 @@ func _show_inventory_section(sect: Resource) -> void:
 		for item in sect.inventory:
 			var row = Label.new()
 			if item is Resource:
-				row.text = "  %s" % item.resource_path.get_file()
+				row.text = "  %s%s x%d" % [
+					_get_quality_prefix(item.quality),
+					item.item_name if item.item_name != "" else item.item_id,
+					item.quantity,
+				]
 			else:
 				row.text = "  %s" % str(item)
 			row.add_theme_font_size_override("font_size", 15)
@@ -245,12 +249,22 @@ func _count_dict(d: Array) -> Dictionary:
 		if item is Dictionary:
 			name = item.get("name", str(item))
 		elif item is Resource:
-			name = item.resource_path.get_file()
+			name = item.item_name if item.item_name != "" else item.item_id
 		else:
 			name = str(item)
 		if name != "":
 			result[name] = result.get(name, 0) + 1
 	return result
+
+
+func _get_quality_prefix(quality: int) -> String:
+	match quality:
+		4: return "极品 "
+		3: return "上品 "
+		2: return "中品 "
+		1: return "下品 "
+		0: return "废品 "
+	return ""
 
 
 func _on_data_changed(_a = null, _b = null, _c = null) -> void:

@@ -100,7 +100,8 @@ func assign_position(disciple: Resource, position_name: String) -> bool:
 
 	var old_pos = disciple.position
 	disciple.position = position_name
-	EventBus.position_changed.emit(disciple.resource_path, old_pos, position_name)
+	disciple.add_memory("宗门历%d年 被任命为%s。" % [TimeManager.year, position_name])
+	EventBus.position_changed.emit(disciple.disciple_id, old_pos, position_name)
 	return true
 
 
@@ -109,7 +110,7 @@ func demote_to_default(disciple: Resource) -> void:
 		return
 	var old = disciple.position
 	disciple.position = "普通弟子"
-	EventBus.position_changed.emit(disciple.resource_path, old, "普通弟子")
+	EventBus.position_changed.emit(disciple.disciple_id, old, "普通弟子")
 
 
 func get_position_count(position_name: String) -> int:

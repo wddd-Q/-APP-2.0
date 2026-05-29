@@ -31,7 +31,7 @@ func _ready() -> void:
 
 	# 外交按钮
 	var diplo_btn = Button.new()
-	diplo_btn.text = "天下势力"
+	diplo_btn.text = "天下榜"
 	diplo_btn.add_theme_font_size_override("font_size", 18)
 	diplo_btn.pressed.connect(_on_diplomacy_pressed)
 	$TopBar.add_child(diplo_btn)
@@ -147,7 +147,7 @@ func _on_disciple_breakthrough(disciple_id: String, realm: int, _sub_realm: int)
 		return
 	var disciple_name = "弟子"
 	for d in sect.disciples:
-		if d.resource_path == disciple_id:
+		if d.disciple_id == disciple_id:
 			disciple_name = d.disciple_name
 			break
 	var realm_name = DataRegistry.get_realm_name(realm)

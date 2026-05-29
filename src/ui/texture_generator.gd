@@ -15,6 +15,9 @@ const TEXTURE_PATHS: Dictionary = {
 	"btn_pressed": "res://assets/textures/ui/buttons/btn_pressed.png",
 	"btn_gold": "res://assets/textures/ui/buttons/btn_gold.png",
 	"btn_danger": "res://assets/textures/ui/buttons/btn_danger.png",
+	"tab_normal": "res://assets/textures/ui/tabs/tab_normal.png",
+	"tab_selected": "res://assets/textures/ui/tabs/tab_selected.png",
+	"border_gold": "res://assets/textures/ui/decorations/border_gold.png",
 	"border_frame": "res://assets/textures/ui/decorations/border_frame.png",
 	"divider": "res://assets/textures/ui/decorations/divider.png",
 	"cloud_pattern": "res://assets/textures/ui/decorations/cloud_pattern.png",
@@ -42,8 +45,9 @@ func get_texture(name: String) -> Texture2D:
 ## 尝试加载外部PNG，失败则调用生成函数
 func _load_or_generate(name: String, generate_fn: Callable) -> Texture2D:
 	var path = TEXTURE_PATHS.get(name, "")
-	if not path.is_empty() and ResourceLoader.exists(path):
-		var img = Image.load_from_file(ProjectSettings.globalize_path(path))
+	if not path.is_empty():
+		var absolute_path := ProjectSettings.globalize_path(path)
+		var img = Image.load_from_file(absolute_path) if FileAccess.file_exists(absolute_path) else null
 		if img != null:
 			print("[TextureGenerator] 加载外部纹理: %s" % path)
 			return ImageTexture.create_from_image(img)
@@ -110,7 +114,7 @@ func _generate_all_textures() -> void:
 func _count_external() -> int:
 	var count = 0
 	for name in TEXTURE_PATHS:
-		if ResourceLoader.exists(TEXTURE_PATHS[name]):
+		if FileAccess.file_exists(ProjectSettings.globalize_path(TEXTURE_PATHS[name])):
 			count += 1
 	return count
 

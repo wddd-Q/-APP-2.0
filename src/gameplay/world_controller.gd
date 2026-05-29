@@ -138,6 +138,134 @@ func get_region_controller(region_id: String) -> String:
 	return region_control.get(region_id, "")
 
 
+func get_power_rankings() -> Array:
+	var entries: Array = []
+	var sect = GameManager.current_sect
+	if sect:
+		entries.append(_make_player_ranking_entry(sect))
+
+	for faction in npc_factions:
+		if faction.is_alive:
+			entries.append(_make_faction_ranking_entry(faction))
+
+	entries.sort_custom(func(a, b): return a["score"] > b["score"])
+	for i in range(entries.size()):
+		entries[i]["world_rank"] = i + 1
+	return entries
+
+
+func get_player_ranking_summary() -> Dictionary:
+	var rankings = get_power_rankings()
+	for i in range(rankings.size()):
+		if rankings[i].get("is_player", false):
+			var above = rankings[i - 1] if i > 0 else {}
+			var leader = rankings[0] if not rankings.is_empty() else {}
+			return {
+				"rank": i + 1,
+				"total": rankings.size(),
+				"entry": rankings[i],
+				"above": above,
+				"leader": leader,
+				"score_gap": int(above.get("score", rankings[i]["score"]) - rankings[i]["score"]),
+			}
+	return {}
+
+
+func _make_player_ranking_entry(sect: Resource) -> Dictionary:
+	var alive_disciples = _get_alive_player_disciples(sect)
+	var combat_power = _calculate_player_combat_power(sect)
+	var highest_realm = _get_player_highest_realm(sect)
+	var score = _calculate_world_score(
+		combat_power,
+		sect.prestige,
+		sect.spirit_stones,
+		alive_disciples,
+		sect.rank,
+		highest_realm
+	)
+	return {
+		"name": sect.name,
+		"is_player": true,
+		"rank_grade": sect.rank,
+		"realm": highest_realm,
+		"prestige": sect.prestige,
+		"spirit_stones": sect.spirit_stones,
+		"combat_power": combat_power,
+		"disciple_count": alive_disciples,
+		"karma": sect.karma,
+		"relation": 100,
+		"aggression": 0,
+		"diplomacy": 0,
+		"score": score,
+		"faction": null,
+	}
+
+
+func _make_faction_ranking_entry(faction: FactionData) -> Dictionary:
+	var score = _calculate_world_score(
+		faction.combat_power,
+		faction.prestige,
+		faction.spirit_stones,
+		faction.disciples.size(),
+		faction.faction_rank,
+		faction.faction_realm
+	)
+	return {
+		"name": faction.faction_name,
+		"is_player": false,
+		"rank_grade": faction.faction_rank,
+		"realm": faction.faction_realm,
+		"prestige": faction.prestige,
+		"spirit_stones": faction.spirit_stones,
+		"combat_power": faction.combat_power,
+		"disciple_count": faction.disciples.size(),
+		"karma": faction.karma,
+		"relation": faction.relation_to_player,
+		"aggression": faction.aggression,
+		"diplomacy": faction.diplomacy,
+		"score": score,
+		"faction": faction,
+	}
+
+
+func _calculate_world_score(combat_power: int, prestige: int, stones: int, disciples: int, rank_grade: int, realm: int) -> int:
+	return int(
+		combat_power
+		+ prestige * 1.2
+		+ stones * 0.18
+		+ disciples * 45
+		+ (10 - rank_grade) * 180
+		+ realm * 140
+	)
+
+
+func _calculate_player_combat_power(sect: Resource) -> int:
+	var total = 0
+	for disciple in sect.disciples:
+		if not disciple.alive:
+			continue
+		var attrs = disciple.bone_structure + disciple.comprehension + disciple.mentality + disciple.talent
+		var realm_weight = disciple.realm * disciple.realm * 38 + disciple.sub_realm * 8
+		total += int(realm_weight + attrs * 0.45)
+	return total
+
+
+func _get_player_highest_realm(sect: Resource) -> int:
+	var highest = 1
+	for disciple in sect.disciples:
+		if disciple.alive:
+			highest = maxi(highest, disciple.realm)
+	return highest
+
+
+func _get_alive_player_disciples(sect: Resource) -> int:
+	var count = 0
+	for disciple in sect.disciples:
+		if disciple.alive:
+			count += 1
+	return count
+
+
 func _initialize_npc_factions() -> void:
 	var names = [
 		"天剑宗", "万花谷", "炼器宗", "丹霞派",

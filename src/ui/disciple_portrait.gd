@@ -52,7 +52,7 @@ func _try_load_custom_texture() -> void:
 
 	# 第一层：精确匹配 {名字}.png
 	var exact_path = PORTRAIT_DIR + _disciple.disciple_name + ".png"
-	if ResourceLoader.exists(exact_path):
+	if FileAccess.file_exists(ProjectSettings.globalize_path(exact_path)):
 		_custom_texture = _load_texture(exact_path)
 		if _custom_texture:
 			return
@@ -64,6 +64,11 @@ func _try_load_custom_texture() -> void:
 
 
 func _load_texture(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		var loaded = load(path)
+		if loaded is Texture2D:
+			return loaded
+
 	var img = Image.load_from_file(ProjectSettings.globalize_path(path))
 	if img != null:
 		return ImageTexture.create_from_image(img)
@@ -77,7 +82,7 @@ func _get_pool_texture() -> String:
 
 	# 用弟子名的 hash 稳定分配（同一弟子每次获得同一张图）
 	var hash_val = hash(_disciple.disciple_name)
-	var idx = hash_val % _pool_cache.size()
+	var idx = abs(hash_val) % _pool_cache.size()
 	return _pool_cache[idx]
 
 
@@ -90,7 +95,7 @@ static func _scan_pool() -> void:
 	var i = 1
 	while true:
 		var path = PORTRAIT_DIR + "pool_%02d.png" % i
-		if ResourceLoader.exists(path):
+		if FileAccess.file_exists(ProjectSettings.globalize_path(path)):
 			_pool_cache.append(path)
 			i += 1
 		else:

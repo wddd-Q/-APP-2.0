@@ -34,9 +34,9 @@ func roll_events() -> Array[Dictionary]:
 		event_cooldowns[event["id"]] = event.get("cooldown", 3)
 		event_history.append(event["id"])
 
-		EventBus.random_event_triggered.emit(event["id"])
-
 	active_events = triggered
+	for event in triggered:
+		EventBus.random_event_triggered.emit(event["id"])
 	return triggered
 
 
@@ -146,6 +146,61 @@ func _initialize_event_pool() -> void:
 				{"label": "严惩不贷", "effects": {"action": "punish", "loyalty": -10, "sect_order": 5}},
 			],
 		},
+		{
+			"id": "foundation_pill_commission",
+			"name": "老丹师借炉",
+			"description": "一位白发丹师路过山门，听闻本门有弟子将近筑基，愿借宗门丹炉代炼一枚筑基丹，但需支付180灵石作为炉火与药引费用。",
+			"scope": "sect",
+			"rarity": "uncommon",
+			"cooldown": 18,
+			"conditions": {"max_year": 5, "missing_item": "foundation"},
+			"choices": [
+				{"label": "请其代炼筑基丹", "effects": {"action": "commission_foundation_pill", "spirit_stones": -180}},
+				{"label": "只请教炼丹心得", "effects": {"action": "alchemy_lecture", "spirit_stones": -60}},
+				{"label": "婉拒", "effects": {"action": "nothing"}},
+			],
+		},
+		{
+			"id": "senior_breakthrough_anxiety",
+			"name": "闭关前夜",
+			"description": "即将触及瓶颈的弟子整夜未眠，担心自己一旦突破失败，会拖累宗门前程。掌门需要给出态度。",
+			"scope": "disciple",
+			"rarity": "common",
+			"cooldown": 8,
+			"conditions": {"min_progress": 0.65},
+			"choices": [
+				{"label": "亲自护法，稳其心神", "effects": {"action": "steady_breakthrough", "spirit_stones": -40}},
+				{"label": "令其继续打磨根基", "effects": {"action": "temper_foundation"}},
+				{"label": "让他自行决断", "effects": {"action": "self_decision"}},
+			],
+		},
+		{
+			"id": "market_foundation_materials",
+			"name": "坊市药材风声",
+			"description": "坊市传来消息，有散修急售数味筑基辅药。价格不算便宜，但错过之后短期内未必还能遇到。",
+			"scope": "sect",
+			"rarity": "common",
+			"cooldown": 10,
+			"conditions": {"max_year": 5},
+			"choices": [
+				{"label": "买下辅药", "effects": {"action": "buy_foundation_materials", "spirit_stones": -120}},
+				{"label": "只买普通灵草", "effects": {"action": "buy_basic_herbs", "spirit_stones": -50}},
+				{"label": "暂不采购", "effects": {"action": "nothing"}},
+			],
+		},
+		{
+			"id": "first_generation_oath",
+			"name": "初代弟子立誓",
+			"description": "夜色下，几名初代弟子在山门前自发立誓：愿与宗门同进退。此事虽小，却能凝聚人心。",
+			"scope": "disciple",
+			"rarity": "uncommon",
+			"cooldown": 24,
+			"conditions": {"min_disciples": 3, "max_year": 3},
+			"choices": [
+				{"label": "记入宗门名册", "effects": {"action": "record_generation_oath", "prestige": 20}},
+				{"label": "赐下灵石嘉奖", "effects": {"action": "reward_generation_oath", "spirit_stones": -90}},
+			],
+		},
 	]
 
 
@@ -177,6 +232,18 @@ func _check_conditions(conditions: Dictionary, sect: Resource) -> bool:
 	if conditions.has("has_vein"):
 		if not sect.get_facility("spirit_vein"):
 			return false
+	if conditions.has("max_year") and TimeManager.year > conditions["max_year"]:
+		return false
+	if conditions.has("missing_item") and _has_inventory_item(sect, conditions["missing_item"]):
+		return false
+	if conditions.has("min_progress"):
+		var has_progress = false
+		for d in sect.disciples:
+			if d.alive and d.cultivation_progress >= conditions["min_progress"]:
+				has_progress = true
+				break
+		if not has_progress:
+			return false
 	return true
 
 
@@ -201,12 +268,15 @@ func _apply_event_effects(effects: Dictionary) -> Dictionary:
 		if amount < 0:
 			if not sect.spend_spirit_stones(-amount):
 				result["messages"].append("灵石不足！")
+				result["blocked"] = true
+				return result
 			else:
 				result["messages"].append("消耗 %d 灵石" % -amount)
+				EventBus.spirit_stones_changed.emit(sect.spirit_stones, amount)
 		else:
 			sect.add_spirit_stones(amount)
 			result["messages"].append("获得 %d 灵石" % amount)
-		EventBus.spirit_stones_changed.emit(sect.spirit_stones, amount)
+			EventBus.spirit_stones_changed.emit(sect.spirit_stones, amount)
 
 	# 声望变化
 	if effects.has("prestige"):
@@ -253,6 +323,24 @@ func _apply_event_effects(effects: Dictionary) -> Dictionary:
 			pass  # 不做任何事
 		"punish":
 			_action_punish(result)
+		"commission_foundation_pill":
+			_action_commission_foundation_pill(result)
+		"alchemy_lecture":
+			_action_alchemy_lecture(result)
+		"steady_breakthrough":
+			_action_steady_breakthrough(result)
+		"temper_foundation":
+			_action_temper_foundation(result)
+		"self_decision":
+			_action_self_decision(result)
+		"buy_foundation_materials":
+			_action_buy_foundation_materials(result)
+		"buy_basic_herbs":
+			_action_buy_basic_herbs(result)
+		"record_generation_oath":
+			_action_record_generation_oath(result)
+		"reward_generation_oath":
+			_action_reward_generation_oath(result)
 		"nothing":
 			pass
 
@@ -431,9 +519,128 @@ func _action_punish(result: Dictionary) -> void:
 	result["messages"].append("严惩违纪弟子，宗门秩序有所提升")
 
 
+func _action_commission_foundation_pill(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	sect.add_inventory_item("foundation", "筑基丹", 0, 2, 1, {"breakthrough_realm": 2})
+	result["messages"].append("老丹师代炼成功，宗门获得中品筑基丹。")
+
+
+func _action_alchemy_lecture(result: Dictionary) -> void:
+	var target = _get_best_skill_disciple("alchemy")
+	if not target:
+		result["messages"].append("无人适合听讲。")
+		return
+	target.skills["alchemy"] = mini(100, target.skills.get("alchemy", 0) + 8)
+	target.add_memory("宗门历%d年 听老丹师讲火候药性，炼丹术有所精进。" % TimeManager.year)
+	result["messages"].append("%s 炼丹术提升。" % target.disciple_name)
+
+
+func _action_steady_breakthrough(result: Dictionary) -> void:
+	var target = _get_most_advanced_disciple()
+	if not target:
+		return
+	target.mentality = mini(100, target.mentality + 5)
+	target.cultivation_progress = minf(1.15, target.cultivation_progress + 0.12)
+	target.add_memory("宗门历%d年 闭关前夜得掌门护法，心神渐定。" % TimeManager.year)
+	result["messages"].append("%s 心境稳固，修为更进一步。" % target.disciple_name)
+
+
+func _action_temper_foundation(result: Dictionary) -> void:
+	var target = _get_most_advanced_disciple()
+	if not target:
+		return
+	target.bone_structure = mini(100, target.bone_structure + 3)
+	target.mentality = mini(100, target.mentality + 3)
+	target.add_memory("宗门历%d年 遵掌门令继续打磨根基，未急于破关。" % TimeManager.year)
+	result["messages"].append("%s 根基更稳，但突破时机暂缓。" % target.disciple_name)
+
+
+func _action_self_decision(result: Dictionary) -> void:
+	var target = _get_most_advanced_disciple()
+	if not target:
+		return
+	if randf() < 0.45:
+		target.cultivation_progress = minf(1.1, target.cultivation_progress + 0.2)
+		target.add_memory("宗门历%d年 自行参悟瓶颈，似有所获。" % TimeManager.year)
+		result["messages"].append("%s 自行参悟，修为上涨。" % target.disciple_name)
+	else:
+		target.mentality = maxi(10, target.mentality - 4)
+		target.add_memory("宗门历%d年 独自面对瓶颈，心绪一度不宁。" % TimeManager.year)
+		result["messages"].append("%s 心境略有波动。" % target.disciple_name)
+
+
+func _action_buy_foundation_materials(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	sect.add_resource(sect.herbs, "ginseng", 2)
+	sect.add_resource(sect.herbs, "lingzhi", 1)
+	result["messages"].append("购得人参2株、灵芝1株，可用于后续炼丹。")
+
+
+func _action_buy_basic_herbs(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	sect.add_resource(sect.herbs, "spirit_herb", 10)
+	result["messages"].append("购得10株灵草。")
+
+
+func _action_record_generation_oath(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	for d in sect.disciples:
+		if d.alive:
+			d.add_memory("宗门历%d年 于山门前立下初代弟子之誓。" % TimeManager.year)
+	result["messages"].append("初代弟子之誓记入宗门名册。")
+
+
+func _action_reward_generation_oath(result: Dictionary) -> void:
+	var sect = GameManager.current_sect
+	for d in sect.disciples:
+		if d.alive:
+			d.cultivation_progress = minf(1.0, d.cultivation_progress + 0.08)
+			d.add_memory("宗门历%d年 因初代弟子之誓受掌门嘉奖。" % TimeManager.year)
+	result["messages"].append("弟子士气大振，修为略有增长。")
+
+
 func _apply_loyalty_change(delta: int) -> void:
 	# 忠诚度变化暂时不影响具体机制，未来可扩展
 	pass
+
+
+func _has_inventory_item(sect: Resource, item_id: String) -> bool:
+	for item in sect.inventory:
+		if item.item_id == item_id and item.quantity > 0:
+			return true
+	return false
+
+
+func _get_most_advanced_disciple():
+	var sect = GameManager.current_sect
+	if not sect:
+		return null
+	var best = null
+	var best_score = -1.0
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		var score = d.realm * 100.0 + d.sub_realm * 10.0 + d.cultivation_progress
+		if score > best_score:
+			best_score = score
+			best = d
+	return best
+
+
+func _get_best_skill_disciple(skill_id: String):
+	var sect = GameManager.current_sect
+	if not sect:
+		return null
+	var best = null
+	var best_value = -1
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		var value = d.skills.get(skill_id, 0) + int(d.comprehension / 10)
+		if value > best_value:
+			best_value = value
+			best = d
+	return best
 
 
 func _random_root_quality() -> String:
