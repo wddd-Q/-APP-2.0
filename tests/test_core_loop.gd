@@ -24,6 +24,7 @@ func run_all_tests() -> void:
 	test_recruitment_profiles()
 	test_construction_progress()
 	test_event_ledger_panel_build()
+	test_sect_view_panel_visual_layers()
 	test_event_handler_personality_influence()
 	test_demon_infiltration_chain()
 	test_onboarding_objectives()
@@ -183,6 +184,26 @@ func test_event_ledger_panel_build() -> void:
 	panel.open_panel()
 	assert_that(panel.visible, "宗门纪事面板应能打开")
 	assert_that(EventController.unread_event_count == 0, "打开纪事后应清除未读红点")
+	panel.queue_free()
+
+
+func test_sect_view_panel_visual_layers() -> void:
+	print("\n=== 测试: 宗门地图视觉信息层 ===")
+	GameSetup.setup_new_game("地图视觉测试宗")
+	var sect = GameManager.current_sect
+	DiscipleController.assign_task(sect.disciples[0], "cultivating")
+	DiscipleController.assign_task(sect.disciples[1], "guarding")
+	DiscipleController.assign_task(sect.disciples[2], "exploring")
+
+	var panel = preload("res://src/ui/sect_view_panel.gd").new()
+	add_child(panel)
+	panel.open_panel()
+	var counts = panel._get_task_summary_counts(sect)
+	assert_that(panel.visible, "宗门地图面板应能打开")
+	assert_that(panel._canvas != null, "宗门地图应创建绘制画布")
+	assert_that(counts["cultivation"] == 1, "宗门地图应统计修炼弟子")
+	assert_that(counts["guard"] == 1, "宗门地图应统计守卫弟子")
+	assert_that(counts["outside"] == 1, "宗门地图应统计外勤弟子")
 	panel.queue_free()
 
 

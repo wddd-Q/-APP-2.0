@@ -63,6 +63,14 @@ const LAYOUT_POSITIONS: Dictionary = {
 	"guest_quarters": Vector2(150, -30),
 }
 
+const TASK_BADGE_COLORS: Dictionary = {
+	"cultivation": Color(0.42, 0.72, 1.0, 0.92),
+	"craft": Color(1.0, 0.62, 0.26, 0.92),
+	"guard": Color(0.95, 0.78, 0.32, 0.92),
+	"outside": Color(0.68, 0.84, 1.0, 0.92),
+	"idle": Color(0.78, 0.74, 0.58, 0.92),
+}
+
 var _info_label: RichTextLabel
 var _canvas: Control
 var _map_texture: Texture2D
@@ -258,6 +266,7 @@ func _on_draw(canvas: Control) -> void:
 			continue
 		var bldg_pos = center + pos_offset * layout_scale
 		canvas.draw_line(center, bldg_pos, Color(0.4, 0.35, 0.25, 0.6), 2.0)
+	_draw_activity_routes(canvas, sect, center, layout_scale)
 
 	# 绘制设施
 	for f in sect.facilities:
@@ -282,6 +291,9 @@ func _on_draw(canvas: Control) -> void:
 		# 边框
 		canvas.draw_rect(Rect2(bldg_pos - Vector2(size, size), Vector2(size * 2, size * 2)),
 			bldg_color.darkened(0.3), false, 2.0)
+
+		var workers = _get_disciples_at_anchor(sect, f.facility_type).size()
+		_draw_facility_activity_halo(canvas, bldg_pos, size, f, workers)
 
 		if f.facility_type == _selected_facility_type:
 			canvas.draw_circle(bldg_pos, size + 9, Color(1.0, 0.85, 0.25, 0.35), false, 3.0)
@@ -308,6 +320,7 @@ func _on_draw(canvas: Control) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11,
 			Color.WHITE
 		)
+		_draw_facility_status_badge(canvas, bldg_pos, size, f, workers)
 
 	# 围墙
 	var wall_radius = minf(canvas.size.x, canvas.size.y) * 0.43
@@ -333,6 +346,7 @@ func _on_draw(canvas: Control) -> void:
 
 	_draw_disciple_markers(canvas, sect, center, wall_radius, layout_scale)
 	_draw_map_clicks(canvas)
+	_draw_task_summary_strip(canvas, sect)
 	_draw_legend(canvas)
 
 
@@ -442,6 +456,96 @@ func _format_effect_value(effect_key: String, value) -> String:
 	if effect_key == "recruit_quality_bonus":
 		return "%s +%d" % [label, int(value)]
 	return "%s %s" % [label, str(value)]
+
+
+func _draw_activity_routes(canvas: Control, sect: Resource, center: Vector2, layout_scale: float) -> void:
+	for f in sect.facilities:
+		var pos_offset = LAYOUT_POSITIONS.get(f.facility_type, Vector2.ZERO)
+		if pos_offset == Vector2.ZERO:
+			continue
+		var bldg_pos = center + pos_offset * layout_scale
+		var workers = _get_disciples_at_anchor(sect, f.facility_type).size()
+		if workers <= 0 and not f.is_building:
+			continue
+		var activity = clampf(float(workers) / 5.0, 0.0, 1.0)
+		var color = Color(0.56, 0.82, 1.0, 0.18 + activity * 0.25)
+		if f.is_building:
+			color = Color(1.0, 0.72, 0.24, 0.28 + activity * 0.22)
+		canvas.draw_line(center, bldg_pos, color, 1.4 + activity * 1.8)
+
+		var dot_count = mini(5, maxi(1, workers + (2 if f.is_building else 0)))
+		for i in range(dot_count):
+			var phase = float(abs(hash(f.facility_type)) % 100) / 100.0
+			var t = fposmod(_anim_time * (0.18 + activity * 0.12) + float(i) / float(dot_count) + phase, 1.0)
+			var dot_pos = center.lerp(bldg_pos, t)
+			canvas.draw_circle(dot_pos, 2.2 + activity * 1.1, color.lightened(0.35))
+
+
+func _draw_facility_activity_halo(canvas: Control, pos: Vector2, size: float, facility: Resource, workers: int) -> void:
+	if workers <= 0 and not facility.is_building:
+		return
+	var pulse = 0.5 + 0.5 * sin(_anim_time * (3.6 if facility.is_building else 2.1) + float(abs(hash(facility.facility_type)) % 9))
+	var color = Color(0.5, 0.8, 1.0, 0.12 + pulse * 0.08)
+	if facility.is_building:
+		color = Color(1.0, 0.75, 0.25, 0.16 + pulse * 0.12)
+	var radius = size + 9.0 + pulse * (7.0 if facility.is_building else 4.0) + float(workers)
+	canvas.draw_circle(pos, radius, color, false, 1.6 + pulse)
+
+
+func _draw_facility_status_badge(canvas: Control, pos: Vector2, size: float, facility: Resource, workers: int) -> void:
+	var label = "%d人" % workers
+	var fill = Color(0.08, 0.07, 0.04, 0.74)
+	var border = Color(0.55, 0.82, 1.0, 0.75)
+	if facility.is_building:
+		label = "建%d%%" % facility.build_progress
+		fill = Color(0.18, 0.12, 0.04, 0.82)
+		border = Color(1.0, 0.78, 0.28, 0.9)
+	var badge_size = Vector2(54, 18)
+	var rect = Rect2(pos + Vector2(size - 8.0, -size - 24.0), badge_size)
+	canvas.draw_rect(rect, fill)
+	canvas.draw_rect(rect, border, false, 1.2)
+	canvas.draw_string(ThemeDB.fallback_font, rect.position + Vector2(0, 13), label,
+		HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, 11, Color(1.0, 0.94, 0.72, 1.0))
+
+
+func _draw_task_summary_strip(canvas: Control, sect: Resource) -> void:
+	var counts = _get_task_summary_counts(sect)
+	var base = Vector2(14, 14)
+	var strip = Rect2(base - Vector2(8, 8), Vector2(336, 34))
+	canvas.draw_rect(strip, Color(0.05, 0.04, 0.03, 0.58))
+	canvas.draw_rect(strip, Color(0.92, 0.78, 0.34, 0.16), false, 1.0)
+	_draw_summary_badge(canvas, base, "修", counts["cultivation"], TASK_BADGE_COLORS["cultivation"])
+	_draw_summary_badge(canvas, base + Vector2(64, 0), "产", counts["craft"], TASK_BADGE_COLORS["craft"])
+	_draw_summary_badge(canvas, base + Vector2(128, 0), "守", counts["guard"], TASK_BADGE_COLORS["guard"])
+	_draw_summary_badge(canvas, base + Vector2(192, 0), "行", counts["outside"], TASK_BADGE_COLORS["outside"])
+	_draw_summary_badge(canvas, base + Vector2(256, 0), "休", counts["idle"], TASK_BADGE_COLORS["idle"])
+
+
+func _draw_summary_badge(canvas: Control, pos: Vector2, label: String, count: int, color: Color) -> void:
+	var rect = Rect2(pos, Vector2(54, 20))
+	canvas.draw_rect(rect, Color(0.04, 0.035, 0.025, 0.68))
+	canvas.draw_rect(Rect2(rect.position, Vector2(5, rect.size.y)), color)
+	canvas.draw_string(ThemeDB.fallback_font, pos + Vector2(9, 14), "%s %d" % [label, count],
+		HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 9, 12, Color(1.0, 0.95, 0.82, 1.0))
+
+
+func _get_task_summary_counts(sect: Resource) -> Dictionary:
+	var counts = {"cultivation": 0, "craft": 0, "guard": 0, "outside": 0, "idle": 0}
+	for d in sect.disciples:
+		if not d.alive:
+			continue
+		match d.assigned_task:
+			"cultivating", "teaching":
+				counts["cultivation"] += 1
+			"alchemy", "crafting", "herb_gathering":
+				counts["craft"] += 1
+			"guarding":
+				counts["guard"] += 1
+			"exploring", "market_work", "guard_caravan", "beast_hunting", "teach_wanderers":
+				counts["outside"] += 1
+			_:
+				counts["idle"] += 1
+	return counts
 
 
 func _draw_construction_effect(canvas: Control, pos: Vector2, size: float, facility: Resource) -> void:
