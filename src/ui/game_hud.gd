@@ -13,6 +13,10 @@ extends Control
 
 var _event_ledger_badge: Label
 var _event_ledger_btn: Button
+var _nav_buttons: Array[Button] = []
+var _tab_nav: Dictionary = {}
+var _top_bar_chrome: Panel
+var _active_tab: int = 0
 
 
 func _ready() -> void:
@@ -24,9 +28,13 @@ func _ready() -> void:
 	EventBus.disciple_broken_through.connect(_on_disciple_breakthrough)
 	EventBus.event_ledger_changed.connect(_refresh_event_badge)
 	advance_month_button.pressed.connect(_on_advance_month)
+	_build_top_bar_chrome()
+	_style_top_bar()
 	_build_side_nav()
+	_bind_tab_nav_buttons()
 	if main_tab_container:
 		main_tab_container.tabs_visible = false
+		main_tab_container.tab_changed.connect(_on_tab_changed)
 
 	_refresh_display(TimeManager.month, TimeManager.year)
 	_refresh_event_badge()
@@ -87,13 +95,91 @@ func _make_nav_button(text: String, callback: Callable) -> Button:
 	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	btn.custom_minimum_size = Vector2(0, 38)
 	btn.add_theme_font_size_override("font_size", 17)
+	_apply_nav_button_style(btn, false, false)
 	btn.pressed.connect(callback)
+	_nav_buttons.append(btn)
 	return btn
+
+
+func _build_top_bar_chrome() -> void:
+	_top_bar_chrome = Panel.new()
+	_top_bar_chrome.name = "TopBarChrome"
+	_top_bar_chrome.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_top_bar_chrome.position = Vector2(185, 4)
+	_top_bar_chrome.size = Vector2(1728, 46)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.055, 0.042, 0.028, 0.94)
+	style.border_color = Color(0.58, 0.45, 0.18, 0.84)
+	style.border_width_bottom = 1
+	style.corner_radius_bottom_left = 6
+	style.corner_radius_bottom_right = 6
+	_top_bar_chrome.add_theme_stylebox_override("panel", style)
+	add_child(_top_bar_chrome)
+	move_child(_top_bar_chrome, 0)
+
+
+func _style_top_bar() -> void:
+	var labels = [date_label, spirit_stones_label, prestige_label, disciple_count_label]
+	for label in labels:
+		label.add_theme_font_size_override("font_size", 18)
+		label.add_theme_color_override("font_color", Color(0.9, 0.82, 0.48, 1.0))
+		label.custom_minimum_size = Vector2(150, 30)
+	_apply_nav_button_style(advance_month_button, false, false)
+
+
+func _bind_tab_nav_buttons() -> void:
+	if _nav_buttons.size() >= 3:
+		_tab_nav[0] = _nav_buttons[0]
+		_tab_nav[1] = _nav_buttons[1]
+		_tab_nav[2] = _nav_buttons[2]
+	_refresh_nav_styles()
+
+
+func _apply_nav_button_style(btn: Button, active: bool, alert: bool) -> void:
+	var normal = _make_nav_button_style(active, alert)
+	var hover = _make_nav_button_style(true, alert)
+	btn.add_theme_stylebox_override("normal", normal)
+	btn.add_theme_stylebox_override("hover", hover)
+	btn.add_theme_stylebox_override("pressed", hover)
+	btn.add_theme_color_override("font_color", Color.WHITE if active else Color(0.9, 0.78, 0.35, 1.0))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+
+
+func _make_nav_button_style(active: bool, alert: bool) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.16, 0.115, 0.064, 0.92)
+	style.border_color = Color(0.38, 0.30, 0.14, 0.72)
+	if active:
+		style.bg_color = Color(0.24, 0.17, 0.08, 0.96)
+		style.border_color = Color(0.9, 0.78, 0.25, 1.0)
+	if alert:
+		style.border_color = Color(0.95, 0.42, 0.26, 0.92)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(5)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 7
+	style.content_margin_bottom = 7
+	return style
 
 
 func _select_tab(index: int) -> void:
 	if main_tab_container and index >= 0 and index < main_tab_container.get_tab_count():
 		main_tab_container.current_tab = index
+		_active_tab = index
+		_refresh_nav_styles()
+
+
+func _on_tab_changed(tab: int) -> void:
+	_active_tab = tab
+	_refresh_nav_styles()
+
+
+func _refresh_nav_styles() -> void:
+	for btn in _nav_buttons:
+		var is_active = _tab_nav.has(_active_tab) and _tab_nav[_active_tab] == btn
+		var is_alert = btn == _event_ledger_btn and EventController.unread_event_count > 0
+		_apply_nav_button_style(btn, is_active, is_alert)
 
 
 func _refresh_display(_month: int, _year: int) -> void:
@@ -107,8 +193,24 @@ func _refresh_display(_month: int, _year: int) -> void:
 	disciple_count_label.text = "弟子: %d/%d" % [sect.disciples.size(), sect.max_disciples()]
 
 
+	_apply_resource_colors(sect)
+
+
 func _on_stones_changed(new_amount: int, _delta: int) -> void:
 	spirit_stones_label.text = "灵石: %d" % new_amount
+
+
+func _apply_resource_colors(sect: Resource) -> void:
+	date_label.add_theme_color_override("font_color", Color(0.9, 0.82, 0.48, 1.0))
+	spirit_stones_label.add_theme_color_override("font_color", Color(0.93, 0.82, 0.38, 1.0))
+	prestige_label.add_theme_color_override("font_color", Color(0.62, 0.82, 1.0, 1.0))
+	var ratio = float(sect.disciples.size()) / float(maxi(1, sect.max_disciples()))
+	var color = Color(0.6, 0.92, 0.62, 1.0)
+	if ratio >= 1.0:
+		color = Color(0.95, 0.36, 0.28, 1.0)
+	elif ratio >= 0.8:
+		color = Color(0.95, 0.68, 0.28, 1.0)
+	disciple_count_label.add_theme_color_override("font_color", color)
 
 
 func _on_rank_changed(_old: int, new_rank: int) -> void:
@@ -190,3 +292,4 @@ func _refresh_event_badge() -> void:
 	if _event_ledger_btn:
 		var count = EventController.unread_event_count
 		_event_ledger_btn.text = "宗门纪事" if count == 0 else "● 宗门纪事"
+		_refresh_nav_styles()
