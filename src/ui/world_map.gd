@@ -11,6 +11,7 @@ var _world_log: RichTextLabel
 var _selected_region: String = ""
 var _marker_nodes: Array[Control] = []
 var _marker_motion: Array[Dictionary] = []
+var _map_clicks: Array[Dictionary] = []
 var _animation_layer: Control
 var _anim_time: float = 0.0
 
@@ -47,6 +48,8 @@ func _build_ui() -> void:
 	_map_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_map_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_map_canvas.clip_contents = true
+	_map_canvas.mouse_filter = Control.MOUSE_FILTER_STOP
+	_map_canvas.gui_input.connect(_on_map_canvas_input)
 	main_hbox.add_child(_map_canvas)
 
 	var map_bg = TextureRect.new()
@@ -208,6 +211,7 @@ func _draw_dynamic_world() -> void:
 	var central = _grid_to_canvas_pos(2, 1, size)
 	_animation_layer.draw_line(home, central, Color(0.35, 0.65, 0.9, 0.22 + pulse * 0.12), 2.0)
 	_animation_layer.draw_line(sealing, home, Color(0.62, 0.12, 0.2, 0.18 + pulse * 0.18), 2.0)
+	_draw_faction_influence_links(size)
 
 	for incident in WorldController.get_world_incidents():
 		var region = DataRegistry.map_regions.get(incident.get("region_id", ""), {})
@@ -224,6 +228,8 @@ func _draw_dynamic_world() -> void:
 		if not selected.is_empty():
 			var selected_pos = _grid_to_canvas_pos(selected.get("grid_x", 0), selected.get("grid_y", 0), size)
 			_animation_layer.draw_circle(selected_pos, 30.0 + pulse * 5.0, Color(0.95, 0.82, 0.32, 0.2), false, 3.0)
+	_draw_map_clicks()
+	_draw_world_status_strip(size)
 
 
 func _grid_to_canvas_pos(grid_x: int, grid_y: int, map_size: Vector2) -> Vector2:
@@ -255,6 +261,9 @@ func _make_marker(text: String, color: Color) -> Button:
 
 func _on_region_clicked(region_id: String) -> void:
 	_selected_region = region_id
+	var region = DataRegistry.map_regions.get(region_id, {})
+	if not region.is_empty() and _animation_layer:
+		_add_map_click(_grid_to_canvas_pos(region.get("grid_x", 0), region.get("grid_y", 0), _animation_layer.size))
 	_refresh_detail(region_id)
 	EventBus.lore_unlocked.emit("discover_region:%s" % region_id)
 
@@ -320,6 +329,8 @@ func _refresh_detail(region_id: String) -> void:
 func _show_incident_detail(incident: Dictionary) -> void:
 	var region = DataRegistry.map_regions.get(incident.get("region_id", ""), {})
 	_selected_region = incident.get("region_id", "")
+	if not region.is_empty() and _animation_layer:
+		_add_map_click(_grid_to_canvas_pos(region.get("grid_x", 0), region.get("grid_y", 0), _animation_layer.size) + Vector2(18, -16))
 	_detail_title.text = incident.get("name", "天下异动")
 	_detail_info.clear()
 	_detail_info.append_text("[b]%s[/b]\n" % incident.get("type", "异动"))
@@ -337,6 +348,97 @@ func _show_world_summary() -> void:
 	_detail_info.append_text("点击地图上的宗门、秘境或异动标记查看详情。\n\n")
 	_detail_info.append_text("[b]标记说明[/b]\n")
 	_detail_info.append_text("本：本门山门\n宗：其他宗门\n秘：秘境或资源点\n战：人魔战线\n妖：妖兽入侵\n疑：宗门疑云\n")
+
+
+func _on_map_canvas_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_add_map_click(event.position)
+
+
+func _add_map_click(position: Vector2) -> void:
+	_map_clicks.append({
+		"position": position,
+		"time": _anim_time,
+	})
+	while _map_clicks.size() > 12:
+		_map_clicks.pop_front()
+	if _animation_layer:
+		_animation_layer.queue_redraw()
+
+
+func _draw_map_clicks() -> void:
+	var alive: Array[Dictionary] = []
+	for click in _map_clicks:
+		var age = _anim_time - float(click.get("time", _anim_time))
+		var t = clampf(age / 0.62, 0.0, 1.0)
+		if t >= 1.0:
+			continue
+		alive.append(click)
+		var pos: Vector2 = click.get("position", Vector2.ZERO)
+		var alpha = 1.0 - t
+		var radius = lerpf(12.0, 70.0, t)
+		_animation_layer.draw_circle(pos, radius * 0.25, Color(0.95, 0.82, 0.32, 0.10 * alpha))
+		_animation_layer.draw_arc(pos, radius, 0.0, TAU, 56, Color(0.95, 0.82, 0.32, 0.58 * alpha), 2.1, true)
+		_animation_layer.draw_arc(pos, radius * 0.58, 0.0, TAU, 56, Color(0.45, 0.82, 0.96, 0.34 * alpha), 1.2, true)
+	_map_clicks = alive
+
+
+func _draw_faction_influence_links(map_size: Vector2) -> void:
+	var home_region = DataRegistry.map_regions.get("player_home", {})
+	if home_region.is_empty():
+		return
+	var home = _grid_to_canvas_pos(home_region.get("grid_x", 0), home_region.get("grid_y", 0), map_size)
+	for faction in WorldController.npc_factions:
+		if not faction.is_alive:
+			continue
+		var region = DataRegistry.map_regions.get(faction.home_region, {})
+		if region.is_empty():
+			continue
+		var target = _grid_to_canvas_pos(region.get("grid_x", 0), region.get("grid_y", 0), map_size)
+		var relation = clampf(float(faction.relation_to_player) / 100.0, -1.0, 1.0)
+		var color = Color(0.45, 0.8, 0.55, 0.18 + absf(relation) * 0.12)
+		if relation < -0.15:
+			color = Color(0.9, 0.28, 0.25, 0.18 + absf(relation) * 0.16)
+		elif absf(relation) <= 0.15:
+			color = Color(0.82, 0.78, 0.55, 0.16)
+		_animation_layer.draw_line(home, target, color, 1.0 + absf(relation) * 1.6)
+		var t = fposmod(_anim_time * 0.18 + float(abs(hash(faction.faction_name)) % 100) / 100.0, 1.0)
+		_animation_layer.draw_circle(home.lerp(target, t), 2.4, color.lightened(0.35))
+
+
+func _draw_world_status_strip(_map_size: Vector2) -> void:
+	var summary = _get_world_status_summary()
+	var rect = Rect2(Vector2(14, 14), Vector2(390, 42))
+	_animation_layer.draw_rect(rect, Color(0.04, 0.035, 0.025, 0.62))
+	_animation_layer.draw_rect(rect, Color(0.9, 0.76, 0.32, 0.18), false, 1.0)
+	_draw_status_chip(rect.position + Vector2(12, 27), "势力", summary["factions"], Color(0.78, 0.9, 1.0, 0.94))
+	_draw_status_chip(rect.position + Vector2(90, 27), "事件", summary["incidents"], Color(0.95, 0.82, 0.32, 0.94))
+	_draw_status_chip(rect.position + Vector2(168, 27), "高危", summary["high"], Color(0.95, 0.26, 0.24, 0.94))
+	_draw_status_chip(rect.position + Vector2(246, 27), "中危", summary["medium"], Color(0.95, 0.58, 0.22, 0.94))
+	_draw_status_chip(rect.position + Vector2(324, 27), "低危", summary["low"], Color(0.62, 0.45, 0.86, 0.94))
+
+
+func _draw_status_chip(pos: Vector2, label: String, value: int, color: Color) -> void:
+	_animation_layer.draw_circle(pos - Vector2(2, 4), 4.0, color)
+	_animation_layer.draw_string(ThemeDB.fallback_font, pos + Vector2(7, 0), "%s%d" % [label, value],
+		HORIZONTAL_ALIGNMENT_LEFT, 62, 12, Color(1.0, 0.96, 0.82, 1.0))
+
+
+func _get_world_status_summary() -> Dictionary:
+	var incidents = WorldController.get_world_incidents()
+	var summary = {"factions": 0, "incidents": incidents.size(), "high": 0, "medium": 0, "low": 0}
+	for faction in WorldController.npc_factions:
+		if faction.is_alive:
+			summary["factions"] += 1
+	for incident in incidents:
+		match incident.get("severity", "low"):
+			"high":
+				summary["high"] += 1
+			"medium":
+				summary["medium"] += 1
+			_:
+				summary["low"] += 1
+	return summary
 
 
 func _on_year_passed(year: int) -> void:

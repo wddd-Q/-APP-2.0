@@ -25,6 +25,7 @@ func run_all_tests() -> void:
 	test_construction_progress()
 	test_event_ledger_panel_build()
 	test_sect_view_panel_visual_layers()
+	test_world_map_visual_layers()
 	test_event_handler_personality_influence()
 	test_demon_infiltration_chain()
 	test_onboarding_objectives()
@@ -204,6 +205,24 @@ func test_sect_view_panel_visual_layers() -> void:
 	assert_that(counts["cultivation"] == 1, "宗门地图应统计修炼弟子")
 	assert_that(counts["guard"] == 1, "宗门地图应统计守卫弟子")
 	assert_that(counts["outside"] == 1, "宗门地图应统计外勤弟子")
+	panel.queue_free()
+
+
+func test_world_map_visual_layers() -> void:
+	print("\n=== 测试: 世界地图视觉信息层 ===")
+	GameSetup.setup_new_game("世界视觉测试宗")
+	WorldController.refresh_world_incidents()
+
+	var panel = preload("res://src/ui/world_map.gd").new()
+	add_child(panel)
+	panel._refresh()
+	var summary = panel._get_world_status_summary()
+	assert_that(panel._map_canvas != null, "世界地图应创建绘制画布")
+	assert_that(panel._animation_layer != null, "世界地图应创建动态绘制层")
+	assert_that(summary["factions"] > 0, "世界地图应统计存活势力")
+	assert_that(summary["incidents"] >= 2, "世界地图应统计当前天下事件")
+	panel._add_map_click(Vector2(120, 80))
+	assert_that(panel._map_clicks.size() == 1, "世界地图应记录点击波纹")
 	panel.queue_free()
 
 
